@@ -108,6 +108,32 @@ def test_documented_visibility_gap_reports_blind_and_passes(smoke_result):
     assert defender.outcome.gap_kind == "visibility"
 
 
+def test_documented_detection_gap_reports_visible_and_passes(smoke_result):
+    rdp = next(
+        r for r in smoke_result.run.results if r.case.rule_name == "rdp_logon_from_workstation"
+    )
+    assert rdp.outcome is Outcome.VISIBLE
+    assert rdp.status is CaseStatus.PASS
+    # The distinction the whole project turns on: the 4624 events arrived, so
+    # this is the rule's fault and not the log pipeline's.
+    assert rdp.telemetry_hits > 0
+    assert rdp.detection_hits == 0
+    assert rdp.outcome.gap_kind == "detection"
+
+
+def test_the_offline_gate_exercises_all_three_states(smoke_result):
+    """quick-smoke must be able to fail in every way the model can describe.
+
+    This is a guard on the profile, not on the rules. Narrow the selection far
+    enough - by severity, tag or status - and the check that runs on every pull
+    request stops covering `visible` or `blind` entirely, which is how a
+    three-state pipeline quietly becomes a pass/fail one.
+    """
+    outcomes = {r.outcome for r in smoke_result.run.results}
+    missing = {Outcome.DETECTED, Outcome.VISIBLE, Outcome.BLIND} - outcomes
+    assert not missing, f"quick-smoke no longer produces: {sorted(o.value for o in missing)}"
+
+
 def test_latency_is_measured_from_the_recorded_offsets(smoke_result):
     lsass = next(
         r for r in smoke_result.run.results if r.case.emulation_id == "T1003.001-lsass-handle-open"

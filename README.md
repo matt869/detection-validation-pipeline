@@ -35,31 +35,39 @@ $ dvp run --profile quick-smoke
   [+] detected  lsass_memory_access / T1003.001-lsass-handle-open 9.0s
   [+] detected  powershell_encoded_command / T1059.001-powershell-encoded 2.0s
   [x] blind     defender_exclusion_added / T1562.001-defender-path-exclusion
+  [!] visible   rdp_logon_from_workstation / T1021.001-rdp-interactive-logon
   [+] detected  run_key_persistence / T1547.001-run-key-appdata 4.0s  noisy(1)
   ...
 
-  detected   15  ######################..  the control works
-  visible     0  ........................  telemetry present, rule silent - detection gap
-  blind       1  ##......................  no telemetry - visibility gap
+  detected   18  ######################..  the control works
+  visible     1  #.......................  telemetry present, rule silent - detection gap
+  blind       1  #.......................  no telemetry - visibility gap
 
-  detection rate      94%   telemetry visibility    94%
-  detect latency    p50 4.0s   p95 5m 31s
-  noisy rules       1 rule(s) also match quiet-baseline activity
+  detection rate      90%   telemetry visibility    95%
+  detect latency    p50 3.0s   p95 5m 16s
+  noisy rules       2 rule(s) also match quiet-baseline activity
 
   pass  no-errors            no cases errored
   pass  expectations-met     every case matched its documented expectation
+  pass  no-regressions       no regressions against the previous run
 
 PASS  all gates satisfied
 ```
 
-That `blind` result is not a failure. `defender_exclusion_added` declares
-`expect: blind` because the Defender channel is not onboarded yet — the gap is
-documented, owned and dated, so it reports `pass` while staying visible in the
-coverage report until it is genuinely closed.
+Neither gap is a failure, and that is the point. `defender_exclusion_added`
+declares `expect: blind` because the Defender channel is not onboarded yet.
+`rdp_logon_from_workstation` declares `expect: visible` because its exclusion
+still swallows all of `10.0.0.0/8` while jump-host segmentation is incomplete —
+the 4624 events arrive and the rule deliberately matches none of them. Both are
+documented, owned and dated, so they report `pass` while staying in every
+coverage report until they are genuinely closed. Change either rule's behaviour
+without changing its `expect:` and the build fails, in *both* directions: a gap
+that quietly starts working is stale metadata, and stale metadata is how a known
+gap becomes a forgotten one.
 
-The `noisy(1)` is a real finding: that rule also matches a Teams autostart entry
-in the quiet baseline window. A rule can be `detected` and noisy at the same
-time, and one that is both is not a working control.
+The `noisy(1)` is a separate finding: that rule also matches a Teams autostart
+entry in the quiet baseline window. A rule can be `detected` and noisy at the
+same time, and one that is both is not a working control.
 
 ## What it does
 
@@ -196,6 +204,10 @@ The offline test suite needs no infrastructure. `make ci` runs the same checks
 as [`.github/workflows/ci.yml`](.github/workflows/ci.yml), which is the
 `pr-smoke` job from `scheduler/jobs.yml` — one manifest, three places that
 execute it, and a test that fails if they drift apart.
+
+Adding a detection is documented in [CONTRIBUTING.md](CONTRIBUTING.md); the
+rules about what may execute, and how to report a hole in them, are in
+[SECURITY.md](SECURITY.md). Changes are in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

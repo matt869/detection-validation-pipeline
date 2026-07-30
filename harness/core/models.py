@@ -34,22 +34,22 @@ class Severity(str, Enum):
     def rank(self) -> int:
         return _SEVERITY_ORDER.index(self)
 
-    def __ge__(self, other: object) -> bool:  # type: ignore[override]
+    def __ge__(self, other: object) -> bool:
         if isinstance(other, Severity):
             return self.rank >= other.rank
         return NotImplemented
 
-    def __gt__(self, other: object) -> bool:  # type: ignore[override]
+    def __gt__(self, other: object) -> bool:
         if isinstance(other, Severity):
             return self.rank > other.rank
         return NotImplemented
 
-    def __le__(self, other: object) -> bool:  # type: ignore[override]
+    def __le__(self, other: object) -> bool:
         if isinstance(other, Severity):
             return self.rank <= other.rank
         return NotImplemented
 
-    def __lt__(self, other: object) -> bool:  # type: ignore[override]
+    def __lt__(self, other: object) -> bool:
         if isinstance(other, Severity):
             return self.rank < other.rank
         return NotImplemented

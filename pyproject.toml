@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "detection-validation-pipeline"
-version = "0.1.0"
+version = "0.2.0"
 description = "Continuously validate SIEM/EDR detections against emulated adversary behaviour using a three-state outcome model."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -33,7 +33,10 @@ dev = [
   "pytest>=8.0",
   "pytest-cov>=5.0",
   "ruff>=0.6",
-  "mypy>=1.11",
+  # 2.0+, and the floor matters: `warn_unused_ignores` is on, and releases
+  # disagree about whether Severity's comparison overrides need a suppression
+  # at all - so one version's clean run is another's error, in both directions.
+  "mypy>=2.0",
   "types-PyYAML",
 ]
 

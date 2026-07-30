@@ -15,7 +15,13 @@ backend: fixture
 
 select:
   statuses: [production]
-  min_severity: high
+  # Medium and above, not high and above. A documented gap sits at whatever
+  # severity the behaviour deserves, and the ones this estate has accepted are
+  # mostly medium - excluding them meant the gate never exercised `visible` at
+  # all, so the one outcome that says "the telemetry is fine, the rule is
+  # wrong" was invisible in the check that runs most often. Replay costs
+  # milliseconds; the gate severity below still decides what can fail a build.
+  min_severity: medium
   tags: [purple-team]
 
 # Corpora to load. Listing them explicitly rather than loading everything is a

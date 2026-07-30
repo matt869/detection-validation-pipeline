@@ -259,3 +259,26 @@ def test_backend_require_reports_the_missing_option(repo_root):
     settings = load_settings(root=repo_root)
     with pytest.raises(ConfigError, match="missing required option"):
         settings.backends["sentinel"].require("workspace_id")
+
+
+def test_package_version_matches_pyproject(repo_root):
+    """Two files declare the version; a release with them disagreeing is a lie.
+
+    `harness.__version__` is what `dvp --version` prints and what is stamped
+    into every stored run, so a stale value misattributes results to the wrong
+    build long after the release itself is forgotten.
+    """
+    import tomllib
+
+    import harness
+
+    with (repo_root / "pyproject.toml").open("rb") as handle:
+        declared = tomllib.load(handle)["project"]["version"]
+    assert harness.__version__ == declared
+
+
+def test_changelog_documents_the_current_version(repo_root):
+    changelog = (repo_root / "CHANGELOG.md").read_text(encoding="utf-8")
+    import harness
+
+    assert f"## [{harness.__version__}]" in changelog

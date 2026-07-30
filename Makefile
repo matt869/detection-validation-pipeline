@@ -93,5 +93,5 @@ clean: ## Remove build artefacts, caches and the local database
 
 ## Content checks run before the code checks on purpose: a broken rule is the
 ## more common failure and the faster signal.
-ci: rules test lint ## Everything a pull request must pass
+ci: rules test lint typecheck schedule-check ## Everything a pull request must pass
 	$(DVP) run --profile quick-smoke --format json --format junit

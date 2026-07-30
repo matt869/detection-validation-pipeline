@@ -520,9 +520,11 @@ class KqlCompiler(QueryCompiler):
 
     def _table(self, rule: Rule) -> str:
         tables = {
-            source.table(self.dialect)
-            for source in self.catalog.resolve(rule.telemetry)
-            if source.table(self.dialect)
+            table
+            for table in (
+                source.table(self.dialect) for source in self.catalog.resolve(rule.telemetry)
+            )
+            if table
         }
         if len(tables) > 1:
             raise CompileError(

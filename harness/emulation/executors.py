@@ -225,11 +225,21 @@ def _invoke(argv: Sequence[str], *, timeout: float) -> _Completed:
         )
         return _Completed(completed.returncode, completed.stdout or "", completed.stderr or "")
     except subprocess.TimeoutExpired as exc:
-        return _Completed(None, exc.stdout or "", f"timed out after {timeout:.0f}s")
+        # `text=True` decodes on the success path, but a timeout can surface
+        # whatever was buffered as raw bytes. Output captured up to the timeout
+        # is often the only evidence of what the behaviour managed to do, so it
+        # is decoded rather than dropped.
+        return _Completed(None, _decode(exc.stdout), f"timed out after {timeout:.0f}s")
     except FileNotFoundError as exc:
         return _Completed(127, "", f"interpreter not found: {exc}")
     except OSError as exc:
         return _Completed(126, "", f"could not start process: {exc}")
+
+
+def _decode(value: bytes | str | None) -> str:
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value or ""
 
 
 def _truncate(text: str, limit: int = 4000) -> str:

@@ -344,17 +344,20 @@ def build_coverage(
             if not technique or targets.is_excluded(technique):
                 continue
 
-            tactics = [ref.tactic] if ref.tactic else reference.tactics_for(technique)
-            tactics = [t for t in tactics if t]
+            # Named `technique_tactics` because `tactics` below is the report's
+            # per-tactic index; two different shapes under one name is how a
+            # later edit reaches for the wrong one.
+            technique_tactics = [ref.tactic] if ref.tactic else reference.tactics_for(technique)
+            technique_tactics = [t for t in technique_tactics if t]
             bucket = buckets.get(technique)
             if bucket is None:
                 detected_target, visible_target, priority = targets.for_technique(
-                    technique, tactics
+                    technique, technique_tactics
                 )
                 bucket = TechniqueCoverage(
                     technique=technique,
                     name=reference.technique_name(technique),
-                    tactics=tuple(dict.fromkeys(tactics)),
+                    tactics=tuple(dict.fromkeys(technique_tactics)),
                     target_detected=detected_target,
                     target_visible=visible_target,
                     priority=priority,

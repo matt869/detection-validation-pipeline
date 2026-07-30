@@ -41,12 +41,14 @@ def _no_duplicates(loader: StrictLoader, node: yaml.MappingNode, deep: bool = Fa
 
 StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _no_duplicates)
 
+
 # Timestamps in rule metadata should stay strings; implicit date coercion turns
 # `date: 2026-01-30` into a datetime.date and breaks string comparisons downstream.
-StrictLoader.add_constructor(
-    "tag:yaml.org,2002:timestamp",
-    lambda loader, node: loader.construct_scalar(node),
-)
+def _keep_as_string(loader: yaml.BaseLoader, node: yaml.ScalarNode) -> str:
+    return str(loader.construct_scalar(node))
+
+
+StrictLoader.add_constructor("tag:yaml.org,2002:timestamp", _keep_as_string)
 
 
 def load_yaml(path: Path | str, *, default: Any = None) -> Any:

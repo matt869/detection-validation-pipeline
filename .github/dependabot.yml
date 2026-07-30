@@ -1,0 +1,19 @@
+# Only the actions ecosystem is watched.
+#
+# Python is deliberately absent: PyYAML is the one required dependency and the
+# dev tools are floor-pinned, so a lockfile bot has nothing useful to do. See
+# docs/adr/0003-minimal-dependencies.md.
+#
+# Actions are different. They are third-party code that runs with a token in a
+# workflow, and an unmaintained one is how a supply-chain problem arrives in a
+# repository that otherwise has no supply chain.
+
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels: [ci]
+    commit-message:
+      prefix: ci

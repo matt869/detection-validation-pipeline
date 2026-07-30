@@ -10,6 +10,7 @@ been thought through.
 | [0001](0001-three-state-outcome-model.md) | Three-state outcome model rather than pass/fail |
 | [0002](0002-default-deny-emulation.md) | Default-deny emulation with a two-key opt-in |
 | [0003](0003-minimal-dependencies.md) | One required dependency |
+| [0004](0004-offline-only-ci.md) | CI validates offline; live validation stays in the lab |
 
 ## Writing one
 

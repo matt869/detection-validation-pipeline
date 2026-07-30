@@ -90,10 +90,7 @@ class Profile:
     def timing(self, base: TimingSettings) -> TimingSettings:
         if not self.timing_overrides:
             return base
-        merged = {
-            key.removesuffix("_seconds"): getattr(base, key)
-            for key in base.__slots__  # type: ignore[attr-defined]
-        }
+        merged = {key.removesuffix("_seconds"): getattr(base, key) for key in base.__slots__}
         merged.update(self.timing_overrides)
         return TimingSettings.from_dict(merged)
 

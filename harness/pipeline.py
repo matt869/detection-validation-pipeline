@@ -424,13 +424,10 @@ class Pipeline:
                 else TimeWindow.last(after)
             )
 
+            probe = telemetry_queries[case.case_id]
             observation.queries = {
                 "detection": detection_queries[case.case_id].text,
-                **(
-                    {"telemetry": telemetry_queries[case.case_id].text}
-                    if telemetry_queries[case.case_id]
-                    else {}
-                ),
+                **({"telemetry": probe.text} if probe is not None else {}),
             }
 
         # -- detection queries, with polling on live backends ---------------
@@ -487,16 +484,16 @@ class Pipeline:
         # -- classify --------------------------------------------------------
         results: list[CaseResult] = []
         for case in cases:
-            result = classify(
+            case_result = classify(
                 case,
                 observations[case.case_id],
                 evidence_limit=self.settings.reporting.evidence_limit,
                 redact_fields=self.settings.reporting.redact_fields,
                 store_evidence=self.settings.storage.store_evidence,
             )
-            results.append(result)
+            results.append(case_result)
             if self.on_case is not None:
-                self.on_case(result)
+                self.on_case(case_result)
         return results
 
     def _search(

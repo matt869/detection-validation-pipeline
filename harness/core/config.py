@@ -32,6 +32,17 @@ _TRUE = {"1", "true", "yes", "on"}
 _FALSE = {"0", "false", "no", "off"}
 
 
+def _defaults(cls: type) -> dict[str, Any]:
+    """A dataclass's declared defaults, keyed by field name.
+
+    Every settings class here is loaded from YAML where any key may be absent,
+    so the class's own default is the fallback. ``fields()`` types a default as
+    possibly-``MISSING``; each of these classes declares one for every field, so
+    that union is noise at the call site and stops here instead.
+    """
+    return {f.name: f.default for f in fields(cls)}
+
+
 @dataclass(frozen=True, slots=True)
 class TimingSettings:
     """How long to wait for telemetry, and how wide to search.
@@ -57,10 +68,11 @@ class TimingSettings:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> TimingSettings:
+        defaults = _defaults(cls)
         return cls(
             **{
-                f.name: parse_duration(data.get(_strip_unit(f.name), None), default=f.default)
-                for f in fields(cls)
+                name: parse_duration(data.get(_strip_unit(name), None), default=default)
+                for name, default in defaults.items()
             }
         )
 
@@ -102,7 +114,7 @@ class SafetySettings:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> SafetySettings:
-        defaults = {f.name: f.default for f in fields(cls)}
+        defaults = _defaults(cls)
         return cls(
             authorized=_as_bool(data.get("authorized"), defaults["authorized"]),
             authorization_reference=str(data.get("authorization_reference") or ""),
