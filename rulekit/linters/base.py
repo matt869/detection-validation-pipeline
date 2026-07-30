@@ -7,6 +7,7 @@ finding can be referenced in a code review by name.
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
@@ -45,10 +46,9 @@ class Finding:
     def format(self, *, root: Path | None = None) -> str:
         location = str(self.path or self.rule_name)
         if root and self.path:
-            try:
+            # A rule outside the project root keeps its absolute path.
+            with contextlib.suppress(ValueError):
                 location = str(self.path.relative_to(root)).replace("\\", "/")
-            except ValueError:
-                pass
         suffix = f" [{self.locator}]" if self.locator else ""
         line = f"{location}: {self.level.value}: {self.code}{suffix}: {self.message}"
         return f"{line}\n    hint: {self.hint}" if self.hint else line

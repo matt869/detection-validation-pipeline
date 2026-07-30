@@ -428,7 +428,13 @@ def _cmd_rules_show(args: argparse.Namespace) -> int:
 def _cmd_rules_lint(args: argparse.Namespace) -> int:
     from harness.pipeline import Workspace
     from rulekit.library import RuleLibrary
-    from rulekit.linters import Level, LintContext, run_linters, summarise
+    from rulekit.linters import (
+        Level,
+        LintContext,
+        filter_findings,
+        run_linters,
+        summarise,
+    )
 
     workspace = Workspace.load(args.root)
     selected = {r.name for r in _select(args, workspace)}
@@ -449,26 +455,29 @@ def _cmd_rules_lint(args: argparse.Namespace) -> int:
         root=workspace.settings.root,
     )
 
-    findings = run_linters(
-        subset,
-        context,
-        only=args.only,
-        ignore=args.ignore,
-        min_level=Level(args.level),
-    )
+    # Lint at the lowest level and filter for display afterwards, so the
+    # summary reports what actually exists. Counting only what passed the
+    # level filter would let `--level error` claim zero warnings while two
+    # were suppressed - a summary that lies quietly is worse than a noisy one.
+    findings = run_linters(subset, context, only=args.only, ignore=args.ignore)
+    shown = filter_findings(findings, min_level=Level(args.level))
 
     if args.json:
-        print(json.dumps([f.to_dict() for f in findings], indent=2))
+        print(json.dumps([f.to_dict() for f in shown], indent=2))
     else:
-        for finding in findings:
+        for finding in shown:
             print(finding.format(root=workspace.settings.root))
 
     counts = summarise(findings)
     print()
-    print(
+    summary = (
         f"{counts['error']} error(s), {counts['warning']} warning(s), "
         f"{counts['info']} info across {len(subset)} rule(s)"
     )
+    suppressed = len(findings) - len(shown)
+    if suppressed:
+        summary += f" ({suppressed} below --level {args.level}, not shown)"
+    print(summary)
 
     if counts["error"]:
         return ExitCode.RULE
@@ -1003,7 +1012,7 @@ def _cmd_db_status(args: argparse.Namespace) -> int:
     workspace = Workspace.load(args.root)
     with workspace.store() as store:
         stats = store.stats()
-    _print_kv({k: v for k, v in stats.items()})
+    _print_kv(dict(stats))
     return ExitCode.OK
 
 
@@ -1074,13 +1083,15 @@ def _cmd_fixtures_verify(args: argparse.Namespace) -> int:
                 print(f"{corpus.name}: events tagged with unknown test '{test_id}'")
                 problems += 1
 
-    missing = sorted(referenced - corpus_tests - {""})
-    for test_id in missing:
-        test = workspace.tests.get(test_id)
-        # A test with no recorded events is how a BLIND outcome is expressed
-        # offline, so it is reported as information, not as an error.
-        detail = "expected: this is how a visibility gap is represented offline"
-        print(dim(f"no recorded events for '{test_id}' ({detail})"))
+    # A test with no recorded events is how a BLIND outcome is expressed
+    # offline, so it is reported as information, not as an error.
+    for test_id in sorted(referenced - corpus_tests - {""}):
+        print(
+            dim(
+                f"no recorded events for '{test_id}' "
+                "(expected: this is how a visibility gap is represented offline)"
+            )
+        )
 
     print()
     print(

@@ -147,7 +147,7 @@ class Backend(ABC):
         """
         return self.search(query, window, limit=1, attribution=attribution).count
 
-    def close(self) -> None:
+    def close(self) -> None:  # noqa: B027 - optional hook, not every backend holds resources
         """Release connections. Always called, even on failure."""
 
     def __enter__(self) -> Backend:

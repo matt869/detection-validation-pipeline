@@ -75,7 +75,7 @@ def test_malformed_jsonl_names_the_line(tmp_path):
     scenario.mkdir()
     (scenario / "events.jsonl").write_text('{"ok": 1}\nnot json\n', encoding="utf-8")
     config = BackendConfig(name="fixture", kind="fixture", options={"path": str(tmp_path)})
-    with pytest.raises(BackendError, match="events.jsonl:2"):
+    with pytest.raises(BackendError, match=r"events\.jsonl:2"):
         FixtureBackend(config, root=tmp_path).load()
 
 

@@ -64,7 +64,9 @@ _KNOWN_MODIFIERS = _COMPARISONS | _TRANSFORMS | _FLAGS
 
 #: Command-line dash variants Windows accepts interchangeably. Attackers use the
 #: unicode forms specifically to slip past rules that only match ASCII hyphen.
-_DASHES = ("-", "/", "–", "—", "―")
+#: The non-ASCII spellings are the entire point: attackers use them precisely
+#: because rules that only match the ASCII hyphen miss them.
+_DASHES = ("-", "/", "–", "—", "―")  # noqa: RUF001 - ambiguous dashes are intentional
 
 
 @dataclass(frozen=True, slots=True)
@@ -294,9 +296,12 @@ def _value_matcher(spec: FieldSpec, candidate: Any) -> Callable[[Any], bool]:
         return lambda observed: observed is None
 
     # Numeric literals compare numerically so `EventID: 10` matches "10".
-    if isinstance(candidate, (int, float)) and not isinstance(candidate, bool):
-        if comparison == "equals":
-            return _numeric_matcher("eq", candidate)
+    if (
+        comparison == "equals"
+        and isinstance(candidate, (int, float))
+        and not isinstance(candidate, bool)
+    ):
+        return _numeric_matcher("eq", candidate)
 
     return _string_matcher(str(candidate), comparison, cased=spec.cased)
 

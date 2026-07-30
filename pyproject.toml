@@ -79,7 +79,14 @@ extend-exclude = ["fixtures/runs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "C4", "RUF"]
-ignore = ["E501"]
+ignore = [
+  "E501",
+  # `class X(str, Enum)` rather than `StrEnum`. Deliberate: these enums are
+  # serialised straight into JSON, SQLite and report templates, and the mixin
+  # form keeps `str(x)`, `x.value` and `json.dumps` behaving identically across
+  # the interpreter versions this has to run on.
+  "UP042",
+]
 
 [tool.mypy]
 python_version = "3.11"
