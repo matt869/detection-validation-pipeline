@@ -1,0 +1,85 @@
+# Linux emulation tests
+#
+# All three are genuinely safe to run in a lab: they write to a scratch path,
+# use an inert payload, and clean up after themselves. They still produce the
+# real auditd records the detections depend on.
+
+tests:
+
+  - id: T1059.004-curl-pipe-shell
+    name: Download and pipe a script straight into a shell
+    technique: T1059.004
+    platform: linux
+    executor: bash
+    safe_mode: true
+    duration: 6s
+    description: >-
+      Reproduces the `curl ... | bash` shape without contacting the network:
+      the URL is served from the loopback file:// scheme equivalent so the
+      command line matches while nothing is actually downloaded.
+    command: |
+      set -eu
+      printf '#!/bin/sh\necho dvp-validation-marker\n' > /tmp/dvp-payload.sh
+      # The detection keys on the command shape, which this reproduces exactly.
+      curl -s "file:///tmp/dvp-payload.sh" | bash
+    cleanup: rm -f /tmp/dvp-payload.sh
+    prerequisites:
+      - auditd execve rules loaded (see infra/ansible/)
+      - curl present on the host
+    expected_telemetry:
+      - auditd_execve
+    references:
+      - https://attack.mitre.org/techniques/T1059/004/
+
+  - id: T1053.003-cron-drop
+    name: Drop a cron entry into /etc/cron.d
+    technique: T1053.003
+    platform: linux
+    privileges: root
+    executor: bash
+    safe_mode: true
+    duration: 6s
+    description: >-
+      Writes a cron file whose command is `/bin/true`, then removes it. Real
+      persistence path, no payload.
+    command: |
+      set -eu
+      printf '*/30 * * * * root /bin/true # dvp-validation-marker\n' > /etc/cron.d/dvp-validation
+      chmod 0644 /etc/cron.d/dvp-validation
+    cleanup: rm -f /etc/cron.d/dvp-validation
+    prerequisites:
+      - auditd watch on /etc/cron.d (see infra/ansible/)
+      - root privileges
+    expected_telemetry:
+      - auditd_file_write
+    references:
+      - https://attack.mitre.org/techniques/T1053/003/
+
+  - id: T1548.003-sudoers-nopasswd
+    name: Add a NOPASSWD entry under /etc/sudoers.d
+    technique: T1548.003
+    platform: linux
+    privileges: root
+    executor: bash
+    safe_mode: true
+    duration: 6s
+    description: >-
+      Creates a sudoers drop-in granting NOPASSWD to a non-existent account, so
+      the file is syntactically real but grants nothing to anyone. Removed by
+      cleanup. Validated with visudo -c before it is left in place.
+    command: |
+      set -eu
+      printf 'dvp-validation-nobody ALL=(ALL) NOPASSWD: /bin/true\n' > /etc/sudoers.d/99-dvp-validation
+      chmod 0440 /etc/sudoers.d/99-dvp-validation
+      visudo -c -f /etc/sudoers.d/99-dvp-validation
+    cleanup: rm -f /etc/sudoers.d/99-dvp-validation
+    prerequisites:
+      - auditd watch on /etc/sudoers.d (see infra/ansible/)
+      - root privileges
+    expected_telemetry:
+      - auditd_file_write
+    references:
+      - https://attack.mitre.org/techniques/T1548/003/
+    notes: >-
+      The grantee account intentionally does not exist. If cleanup fails the
+      file is inert, but remove it anyway.

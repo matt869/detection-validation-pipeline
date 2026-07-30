@@ -1,0 +1,12 @@
+scenario: linux-server
+description: >-
+  auditd records from a lab Linux server during execution and persistence
+  emulation. Recorded with the execve and file-watch rules from
+  infra/ansible/auditd.rules.
+recorded_at: "2026-05-14T15:02:00Z"
+recorded_from: lab-lnx-02
+sensor: auditd 3.1 with the rules in infra/ansible/
+tests:
+  - T1059.004-curl-pipe-shell
+  - T1053.003-cron-drop
+  - T1548.003-sudoers-nopasswd

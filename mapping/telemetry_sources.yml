@@ -1,0 +1,550 @@
+# Telemetry source catalogue
+#
+# Every detection rule declares which of these sources it depends on. The
+# harness uses one definition for two purposes:
+#
+#   * scoping   - prefixed onto the rule's detection query
+#   * probing   - run alone, it answers "did this log source produce anything
+#                 during the test window?", which is what separates a VISIBLE
+#                 detection gap from a BLIND visibility gap.
+#
+# Keeping both in one place means a rule can never search one index while its
+# blindness probe checks another.
+#
+# `fixture` scopes are field/value mappings evaluated with normal Sigma
+# selection semantics against the offline event corpus.
+
+version: 1
+
+sources:
+
+  # ---------------------------------------------------------------- Windows / Sysmon
+
+  sysmon_process_creation:
+    name: Sysmon Event ID 1 - Process Creation
+    platform: windows
+    provider: Microsoft-Windows-Sysmon
+    description: >-
+      Process creation with full command line, hashes, parent lineage and the
+      integrity level. The single highest-value endpoint source.
+    event_ids: ["1"]
+    owner: endpoint-engineering
+    onboarding: >-
+      Deploy the Sysmon config in infra/sysmon/ and confirm the WEF subscription
+      forwards Microsoft-Windows-Sysmon/Operational.
+    fields:
+      - EventID
+      - UtcTime
+      - Image
+      - OriginalFileName
+      - CommandLine
+      - CurrentDirectory
+      - User
+      - IntegrityLevel
+      - Hashes
+      - ParentImage
+      - ParentCommandLine
+      - ProcessGuid
+      - Computer
+      - Channel
+    backends:
+      splunk:
+        scope: 'index=windows sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1'
+      elastic:
+        scope: 'event.provider:"Microsoft-Windows-Sysmon" AND event.code:"1"'
+      sentinel:
+        table: SysmonEvent
+        scope: "EventID == 1"
+      fixture:
+        scope:
+          Channel: Microsoft-Windows-Sysmon/Operational
+          EventID: 1
+
+  sysmon_network_connection:
+    name: Sysmon Event ID 3 - Network Connection
+    platform: windows
+    provider: Microsoft-Windows-Sysmon
+    description: Outbound/inbound TCP+UDP connections attributed to a process.
+    event_ids: ["3"]
+    owner: endpoint-engineering
+    onboarding: Sysmon config must not exclude the initiating image.
+    fields:
+      - EventID
+      - UtcTime
+      - Image
+      - User
+      - Protocol
+      - SourceIp
+      - SourcePort
+      - DestinationIp
+      - DestinationPort
+      - DestinationHostname
+      - Computer
+      - Channel
+    backends:
+      splunk:
+        scope: 'index=windows sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3'
+      elastic:
+        scope: 'event.provider:"Microsoft-Windows-Sysmon" AND event.code:"3"'
+      sentinel:
+        table: SysmonEvent
+        scope: "EventID == 3"
+      fixture:
+        scope:
+          Channel: Microsoft-Windows-Sysmon/Operational
+          EventID: 3
+
+  sysmon_process_access:
+    name: Sysmon Event ID 10 - Process Access
+    platform: windows
+    provider: Microsoft-Windows-Sysmon
+    description: >-
+      One process opening a handle to another, with the granted access mask and
+      the call stack. The primary source for LSASS credential access detection.
+    event_ids: ["10"]
+    owner: endpoint-engineering
+    onboarding: >-
+      Noisy by default. The shipped Sysmon config narrows ProcessAccess to
+      lsass.exe targets; without that narrowing this source is usually dropped.
+    fields:
+      - EventID
+      - UtcTime
+      - SourceImage
+      - SourceProcessId
+      - SourceUser
+      - TargetImage
+      - TargetProcessId
+      - GrantedAccess
+      - CallTrace
+      - Computer
+      - Channel
+    backends:
+      splunk:
+        scope: 'index=windows sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=10'
+      elastic:
+        scope: 'event.provider:"Microsoft-Windows-Sysmon" AND event.code:"10"'
+      sentinel:
+        table: SysmonEvent
+        scope: "EventID == 10"
+      fixture:
+        scope:
+          Channel: Microsoft-Windows-Sysmon/Operational
+          EventID: 10
+
+  sysmon_registry_set:
+    name: Sysmon Event ID 13 - Registry Value Set
+    platform: windows
+    provider: Microsoft-Windows-Sysmon
+    description: Registry value writes, with the writing process and the new value.
+    event_ids: ["13"]
+    owner: endpoint-engineering
+    fields:
+      - EventID
+      - UtcTime
+      - EventType
+      - Image
+      - TargetObject
+      - Details
+      - User
+      - Computer
+      - Channel
+    backends:
+      splunk:
+        scope: 'index=windows sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=13'
+      elastic:
+        scope: 'event.provider:"Microsoft-Windows-Sysmon" AND event.code:"13"'
+      sentinel:
+        table: SysmonEvent
+        scope: "EventID == 13"
+      fixture:
+        scope:
+          Channel: Microsoft-Windows-Sysmon/Operational
+          EventID: 13
+
+  sysmon_file_create:
+    name: Sysmon Event ID 11 - File Create
+    platform: windows
+    provider: Microsoft-Windows-Sysmon
+    description: File creation events, used for dropped payloads and hive dumps.
+    event_ids: ["11"]
+    owner: endpoint-engineering
+    fields:
+      - EventID
+      - UtcTime
+      - Image
+      - TargetFilename
+      - User
+      - Computer
+      - Channel
+    backends:
+      splunk:
+        scope: 'index=windows sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=11'
+      elastic:
+        scope: 'event.provider:"Microsoft-Windows-Sysmon" AND event.code:"11"'
+      sentinel:
+        table: SysmonEvent
+        scope: "EventID == 11"
+      fixture:
+        scope:
+          Channel: Microsoft-Windows-Sysmon/Operational
+          EventID: 11
+
+  sysmon_wmi_subscription:
+    name: Sysmon Event ID 19/20/21 - WMI Subscription
+    platform: windows
+    provider: Microsoft-Windows-Sysmon
+    description: WMI event filter, consumer, and binding registration.
+    event_ids: ["19", "20", "21"]
+    owner: endpoint-engineering
+    fields:
+      - EventID
+      - UtcTime
+      - EventType
+      - Operation
+      - User
+      - Name
+      - Query
+      - Destination
+      - Consumer
+      - Filter
+      - Computer
+      - Channel
+    backends:
+      splunk:
+        scope: 'index=windows sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" (EventCode=19 OR EventCode=20 OR EventCode=21)'
+      elastic:
+        scope: 'event.provider:"Microsoft-Windows-Sysmon" AND event.code:("19" OR "20" OR "21")'
+      sentinel:
+        table: SysmonEvent
+        scope: "EventID in (19, 20, 21)"
+      fixture:
+        scope:
+          Channel: Microsoft-Windows-Sysmon/Operational
+          EventID:
+            - 19
+            - 20
+            - 21
+
+  # ------------------------------------------------------- Windows / native logs
+
+  windows_security_process_creation:
+    name: Windows Security 4688 - Process Creation
+    platform: windows
+    provider: Microsoft-Windows-Security-Auditing
+    description: >-
+      Native process creation auditing. Weaker than Sysmon EID 1 - no hashes,
+      and command line only when "Include command line in process creation
+      events" is enabled by policy.
+    event_ids: ["4688"]
+    owner: platform-engineering
+    onboarding: >-
+      Enable Audit Process Creation (Success) plus the command-line inclusion
+      policy; without the latter this source cannot support command-line rules.
+    fields:
+      - EventID
+      - NewProcessName
+      - CommandLine
+      - ParentProcessName
+      - SubjectUserName
+      - TokenElevationType
+      - Computer
+      - Channel
+    backends:
+      splunk:
+        scope: 'index=windows sourcetype="XmlWinEventLog:Security" EventCode=4688'
+      elastic:
+        scope: 'winlog.channel:"Security" AND event.code:"4688"'
+      sentinel:
+        table: SecurityEvent
+        scope: "EventID == 4688"
+      fixture:
+        scope:
+          Channel: Security
+          EventID: 4688
+
+  windows_security_logon:
+    name: Windows Security 4624/4625 - Logon
+    platform: windows
+    provider: Microsoft-Windows-Security-Auditing
+    description: Successful and failed interactive, network, and RDP logons.
+    event_ids: ["4624", "4625"]
+    owner: platform-engineering
+    fields:
+      - EventID
+      - LogonType
+      - TargetUserName
+      - TargetDomainName
+      - IpAddress
+      - WorkstationName
+      - AuthenticationPackageName
+      - LogonProcessName
+      - Computer
+      - Channel
+    backends:
+      splunk:
+        scope: 'index=windows sourcetype="XmlWinEventLog:Security" (EventCode=4624 OR EventCode=4625)'
+      elastic:
+        scope: 'winlog.channel:"Security" AND event.code:("4624" OR "4625")'
+      sentinel:
+        table: SecurityEvent
+        scope: "EventID in (4624, 4625)"
+      fixture:
+        scope:
+          Channel: Security
+          EventID:
+            - 4624
+            - 4625
+
+  windows_security_log_cleared:
+    name: Windows Security 1102 - Audit Log Cleared
+    platform: windows
+    provider: Microsoft-Windows-Eventlog
+    description: The security audit log was cleared. Never benign on a server.
+    event_ids: ["1102"]
+    owner: platform-engineering
+    fields:
+      - EventID
+      - SubjectUserName
+      - SubjectDomainName
+      - Computer
+      - Channel
+    backends:
+      splunk:
+        scope: 'index=windows sourcetype="XmlWinEventLog:Security" EventCode=1102'
+      elastic:
+        scope: 'winlog.channel:"Security" AND event.code:"1102"'
+      sentinel:
+        table: SecurityEvent
+        scope: "EventID == 1102"
+      fixture:
+        scope:
+          Channel: Security
+          EventID: 1102
+
+  windows_system_service_install:
+    name: Windows System 7045 - Service Installed
+    platform: windows
+    provider: Service Control Manager
+    description: A new service was installed, with its image path and start type.
+    event_ids: ["7045"]
+    owner: platform-engineering
+    fields:
+      - EventID
+      - ServiceName
+      - ImagePath
+      - ServiceType
+      - StartType
+      - AccountName
+      - Computer
+      - Channel
+    backends:
+      splunk:
+        scope: 'index=windows sourcetype="XmlWinEventLog:System" EventCode=7045'
+      elastic:
+        scope: 'winlog.channel:"System" AND event.code:"7045"'
+      sentinel:
+        table: Event
+        scope: "EventID == 7045"
+      fixture:
+        scope:
+          Channel: System
+          EventID: 7045
+
+  windows_powershell_scriptblock:
+    name: PowerShell 4104 - Script Block Logging
+    platform: windows
+    provider: Microsoft-Windows-PowerShell
+    description: >-
+      De-obfuscated script block text. Sees through -EncodedCommand, which
+      command-line-only sources cannot.
+    event_ids: ["4104"]
+    owner: endpoint-engineering
+    onboarding: >-
+      Enable "Turn on PowerShell Script Block Logging" by GPO. Warning-level
+      events only are logged unless verbose logging is also enabled.
+    fields:
+      - EventID
+      - ScriptBlockText
+      - Path
+      - MessageNumber
+      - MessageTotal
+      - ScriptBlockId
+      - UserId
+      - Computer
+      - Channel
+    backends:
+      splunk:
+        scope: 'index=windows sourcetype="XmlWinEventLog:Microsoft-Windows-PowerShell/Operational" EventCode=4104'
+      elastic:
+        scope: 'winlog.channel:"Microsoft-Windows-PowerShell\\/Operational" AND event.code:"4104"'
+      sentinel:
+        table: Event
+        scope: "EventID == 4104"
+      fixture:
+        scope:
+          Channel: Microsoft-Windows-PowerShell/Operational
+          EventID: 4104
+
+  windows_defender_operational:
+    name: Microsoft Defender 5007 - Configuration Changed
+    platform: windows
+    provider: Microsoft-Windows-Windows Defender
+    description: Defender configuration changes, including exclusion additions.
+    event_ids: ["5001", "5007"]
+    owner: endpoint-engineering
+    onboarding: >-
+      Forward Microsoft-Windows-Windows Defender/Operational. Frequently missed
+      because the channel is not in the default WEF subscription.
+    fields:
+      - EventID
+      - OldValue
+      - NewValue
+      - ProductName
+      - Computer
+      - Channel
+    backends:
+      splunk:
+        scope: 'index=windows sourcetype="XmlWinEventLog:Microsoft-Windows-Windows Defender/Operational" (EventCode=5001 OR EventCode=5007)'
+      elastic:
+        scope: 'event.provider:"Microsoft-Windows-Windows Defender" AND event.code:("5001" OR "5007")'
+      sentinel:
+        table: Event
+        scope: "EventID in (5001, 5007)"
+      fixture:
+        scope:
+          Channel: Microsoft-Windows-Windows Defender/Operational
+          EventID:
+            - 5001
+            - 5007
+
+  # ------------------------------------------------------------------- Linux
+
+  auditd_execve:
+    name: auditd EXECVE - Command Execution
+    platform: linux
+    provider: auditd
+    description: Executed command lines with the full argument vector.
+    event_ids: ["EXECVE", "SYSCALL"]
+    owner: linux-platform
+    onboarding: >-
+      Ship the execve rules from infra/ansible/ and confirm auditd is not
+      dropping records under load (check `auditctl -s` lost counters).
+    fields:
+      - type
+      - exe
+      - comm
+      - cmdline
+      - auid
+      - uid
+      - euid
+      - pid
+      - ppid
+      - tty
+      - host
+      - success
+    backends:
+      splunk:
+        scope: 'index=linux sourcetype=linux_audit type=EXECVE'
+      elastic:
+        scope: 'event.module:"auditd" AND auditd.log.record_type:"EXECVE"'
+      sentinel:
+        table: Syslog
+        scope: 'Facility == "authpriv"'
+      fixture:
+        scope:
+          source: auditd
+          type: EXECVE
+
+  auditd_file_write:
+    name: auditd PATH - Watched File Modified
+    platform: linux
+    provider: auditd
+    description: Writes to watched paths such as /etc/sudoers and /etc/cron.d.
+    event_ids: ["PATH"]
+    owner: linux-platform
+    fields:
+      - type
+      - name
+      - exe
+      - cmdline
+      - auid
+      - uid
+      - key
+      - host
+      - nametype
+    backends:
+      splunk:
+        scope: 'index=linux sourcetype=linux_audit type=PATH'
+      elastic:
+        scope: 'event.module:"auditd" AND auditd.log.record_type:"PATH"'
+      sentinel:
+        table: Syslog
+        scope: 'Facility == "authpriv"'
+      fixture:
+        scope:
+          source: auditd
+          type: PATH
+
+  # ------------------------------------------------------------------- Cloud
+
+  aws_cloudtrail_management:
+    name: AWS CloudTrail - Management Events
+    platform: aws
+    provider: AWS CloudTrail
+    description: Control-plane API calls across all regions.
+    owner: cloud-security
+    onboarding: >-
+      A multi-region organisation trail with management events enabled. Verify
+      the trail is not excluded by an event selector.
+    fields:
+      - eventSource
+      - eventName
+      - eventTime
+      - awsRegion
+      - sourceIPAddress
+      - userAgent
+      - userIdentity.type
+      - userIdentity.arn
+      - userIdentity.userName
+      - requestParameters
+      - responseElements
+      - errorCode
+      - readOnly
+      - recipientAccountId
+    backends:
+      splunk:
+        scope: 'index=cloudtrail sourcetype=aws:cloudtrail'
+      elastic:
+        scope: 'event.dataset:"aws.cloudtrail"'
+      sentinel:
+        table: AWSCloudTrail
+        scope: 'isnotempty(EventName)'
+      fixture:
+        scope:
+          source: aws.cloudtrail
+
+  aws_guardduty_findings:
+    name: AWS GuardDuty - Findings
+    platform: aws
+    provider: AWS GuardDuty
+    description: Managed detections, used as a corroborating source not a primary one.
+    owner: cloud-security
+    fields:
+      - type
+      - severity
+      - title
+      - accountId
+      - region
+      - resource.resourceType
+      - service.action.actionType
+    backends:
+      splunk:
+        scope: 'index=cloudtrail sourcetype=aws:guardduty'
+      elastic:
+        scope: 'event.dataset:"aws.guardduty"'
+      sentinel:
+        table: AWSGuardDuty
+        scope: "isnotempty(Type)"
+      fixture:
+        scope:
+          source: aws.guardduty

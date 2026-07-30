@@ -1,0 +1,81 @@
+id: 9d2f6b41-8c07-4e35-b9a2-51f38e0c7d46
+name: defender_exclusion_added
+title: Microsoft Defender exclusion added outside policy
+status: production
+severity: high
+description: >-
+  A path, extension, or process exclusion was written to the Defender
+  configuration by something other than managed policy. Adding an exclusion and
+  then staging a payload inside it is a standard preparatory step, so this
+  usually precedes execution rather than following it. Compare the excluded path
+  against files created on the host in the following minutes.
+author: detection-engineering
+date: 2026-02-11
+modified: 2026-06-03
+references:
+  - https://attack.mitre.org/techniques/T1562/001/
+
+attack:
+  tactics: [defense-evasion]
+  techniques: [T1562.001]
+
+platforms: [windows]
+
+logsource:
+  product: windows
+  service: windefend
+
+telemetry:
+  - windows_defender_operational
+
+detection:
+  selection:
+    EventID: 5007
+    NewValue|contains: '\Exclusions\'
+
+  # Exclusions pushed by Intune or GPO land under the Policies hive and are
+  # managed centrally, so they are reviewed elsewhere.
+  filter_managed_policy:
+    NewValue|contains: '\Policies\Microsoft\Windows Defender\Exclusions\'
+
+  condition: selection and not filter_managed_policy
+
+fields:
+  - Computer
+  - OldValue
+  - NewValue
+  - ProductName
+
+falsepositives:
+  - >-
+    Application vendors whose installers add their own exclusions. Each one
+    should be converted into a managed policy exclusion rather than allowlisted
+    here, so that the local-write path stays alertable.
+
+validation:
+  emulation:
+    - T1562.001-defender-path-exclusion
+  # Deliberately not `detected`. See the justification: the log source that
+  # would carry this event is not collected yet, so the honest expectation is
+  # a visibility gap. The run still executes and still reports - it simply
+  # reports PASS for a gap we have already accepted and scheduled.
+  expect: blind
+  justification: >-
+    Microsoft-Windows-Windows Defender/Operational is not in the WEF
+    subscription. Onboarding is tracked in SEC-4471, targeted for 2026-Q4.
+    Until then this rule is validated for correctness but cannot fire.
+  owner: endpoint-engineering
+  max_latency: 5m
+
+tuning:
+  baseline_profile: windows-workstation
+  expected_daily_volume: 0
+  notes:
+    - >-
+      Once SEC-4471 lands, change `expect` to `detected` and remove the
+      justification. The pipeline will then report a FAIL if the source
+      regresses, which is the point of the exercise.
+
+tags:
+  - purple-team
+  - known-gap

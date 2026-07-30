@@ -1,0 +1,84 @@
+id: 3c60a7e2-1d94-4b8f-97e0-6a2f5c81b3d7
+name: rundll32_script_proxy
+title: rundll32.exe used to proxy script or remote content execution
+status: production
+severity: high
+description: >-
+  rundll32.exe was invoked with a script scheme, the mshtml RunHTMLApplication
+  entry point, or a DLL on a network path. All three run attacker-controlled
+  code under a signed Microsoft binary, which defeats naive application
+  allowlisting. The DLL argument is the payload - retrieve it before it is
+  cleaned up.
+author: detection-engineering
+date: 2026-02-19
+references:
+  - https://attack.mitre.org/techniques/T1218/011/
+  - https://lolbas-project.github.io/lolbas/Binaries/Rundll32/
+
+attack:
+  tactics: [defense-evasion]
+  techniques: [T1218.011]
+
+platforms: [windows]
+
+logsource:
+  product: windows
+  service: sysmon
+  category: process_creation
+
+telemetry:
+  - sysmon_process_creation
+
+detection:
+  selection_process:
+    EventID: 1
+    Image|endswith: '\rundll32.exe'
+
+  selection_script_proxy:
+    CommandLine|contains:
+      - 'javascript:'
+      - 'vbscript:'
+      - 'mshtml,RunHTMLApplication'
+      - 'RunHTMLApplication'
+
+  # A DLL loaded straight off a share, rather than from disk.
+  selection_remote_dll:
+    CommandLine|contains: '\\\\'
+
+  filter_windows_shell_verbs:
+    CommandLine|contains:
+      - 'shell32.dll,Control_RunDLL'
+      - 'davclnt.dll,DavSetCookie'
+
+  condition: selection_process and (selection_script_proxy or selection_remote_dll) and not filter_windows_shell_verbs
+
+fields:
+  - Computer
+  - User
+  - CommandLine
+  - ParentImage
+  - ParentCommandLine
+  - IntegrityLevel
+
+falsepositives:
+  - >-
+    Control Panel applets and WebDAV cookie setting use rundll32 with UNC-ish
+    arguments; both are excluded by filter_windows_shell_verbs.
+  - >-
+    Software distributed from a DFS share may legitimately load DLLs over UNC.
+    Exclude by full share path, not by the `\\` prefix.
+
+validation:
+  emulation:
+    - T1218.011-rundll32-javascript
+  expect: detected
+  max_latency: 3m
+  owner: detection-engineering
+
+tuning:
+  baseline_profile: windows-workstation
+  expected_daily_volume: 0
+
+tags:
+  - purple-team
+  - lolbin

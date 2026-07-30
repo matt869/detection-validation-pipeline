@@ -1,0 +1,12 @@
+scenario: credential-theft
+description: >-
+  Recorded Sysmon telemetry from a lab host during credential access emulation.
+  Includes a legitimate MsMpEng handle open alongside the malicious one, so the
+  exclusion logic in lsass_memory_access is exercised rather than assumed.
+recorded_at: "2026-05-14T09:12:00Z"
+recorded_from: WKS-LAB-014
+sensor: Sysmon 15.15 with the config in infra/sysmon/
+tests:
+  - T1003.001-lsass-handle-open
+  - T1003.001-comsvcs-minidump
+  - T1003.002-reg-save-sam

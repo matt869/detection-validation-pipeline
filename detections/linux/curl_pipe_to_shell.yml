@@ -1,0 +1,82 @@
+id: a7d914e6-52b0-4c73-9f81-2c46a0e3b7d5
+name: curl_pipe_to_shell
+title: Remote content downloaded and piped directly into a shell
+status: production
+severity: high
+description: >-
+  curl or wget output was piped straight into a shell interpreter, so the
+  downloaded script executed without ever being written to disk. This is the
+  standard one-liner for both convenience installers and initial-stage droppers,
+  and the two are indistinguishable from the command line alone - the URL is the
+  discriminator. Retrieve it and check reputation before anything else.
+author: detection-engineering
+date: 2026-02-14
+references:
+  - https://attack.mitre.org/techniques/T1059/004/
+
+attack:
+  tactics: [execution]
+  techniques: [T1059.004]
+
+platforms: [linux]
+
+logsource:
+  product: linux
+  service: auditd
+  category: process_creation
+
+telemetry:
+  - auditd_execve
+
+detection:
+  selection:
+    type: EXECVE
+    cmdline|re: '(curl|wget)\s[^|]*\|\s*(/usr/bin/|/bin/)?(ba|z|k|da)?sh\b'
+
+  # Package managers legitimately fetch and execute maintainer scripts.
+  filter_package_managers:
+    exe|endswith:
+      - '/apt'
+      - '/apt-get'
+      - '/dnf'
+      - '/yum'
+      - '/dpkg'
+      - '/rpm'
+
+  condition: selection and not filter_package_managers
+
+fields:
+  - host
+  - auid
+  - uid
+  - exe
+  - cmdline
+  - ppid
+
+falsepositives:
+  - >-
+    Developer laptops and CI runners install tooling this way constantly. Scope
+    the rule to servers, or accept the volume on build infrastructure and rely
+    on the URL allowlist instead.
+  - >-
+    Container image builds. Exclude by the auid of the build user rather than
+    by command shape.
+
+validation:
+  emulation:
+    - T1059.004-curl-pipe-shell
+  expect: detected
+  max_latency: 3m
+  owner: linux-platform
+
+tuning:
+  baseline_profile: linux-server
+  expected_daily_volume: 1
+  notes:
+    - >-
+      The regex forces the Splunk compiler into `| where match(...)` mode,
+      which does not benefit from index-time filtering. The auditd index is
+      small enough that this is acceptable; revisit if it is not.
+
+tags:
+  - purple-team

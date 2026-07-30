@@ -1,0 +1,129 @@
+# Copy to config/settings.yml and edit. This example file is loaded as a
+# fallback so a fresh clone works with no configuration at all - offline,
+# against the recorded fixtures, executing nothing.
+#
+# Precedence, lowest to highest:
+#   built-in defaults -> this file -> DVP_* environment variables -> CLI flags
+
+# Backend used when neither the profile nor --backend says otherwise.
+# `fixture` replays recorded telemetry and needs no infrastructure.
+default_backend: fixture
+
+# Labels attached to every run. Useful when several teams share a database.
+labels:
+  team: detection-engineering
+  environment: lab
+
+timing:
+  # Typical delay between an event happening and it being searchable. Querying
+  # earlier than this is the most common cause of a false visibility gap.
+  ingest_lag: 60s
+  # How long to keep re-querying an undetected case before calling it.
+  max_wait: 5m
+  poll_interval: 15s
+  # Search window padding, to absorb clock skew between the endpoint and the
+  # platform. Generous on purpose: a missed detection due to a 40-second clock
+  # drift is an expensive way to learn about NTP.
+  pre_window: 2m
+  post_window: 5m
+  # Quiet period sampled before emulation, to measure how much noise each rule
+  # produces on its own.
+  baseline_window: 1h
+  # Gap between consecutive tests when executing for real. Overlapping
+  # behaviours cannot be attributed, which makes every latency meaningless.
+  inter_test_delay: 5s
+
+# ---------------------------------------------------------------------------
+# Safety
+#
+# Default posture is do-nothing. `dvp run` plans, replays, and reports without
+# any of this being set; it will not execute a single command until a human
+# sets `authorized: true`, records a reference, and passes --execute.
+#
+# Read docs/threat-model.md before changing anything here.
+# ---------------------------------------------------------------------------
+safety:
+  # Set by a person, not by automation.
+  authorized: false
+  # A change ticket or rules-of-engagement document. Stored with every run.
+  # Authorisation without a traceable reference is refused.
+  authorization_reference: ""
+
+  # Hosts emulation may target, as glob patterns.
+  # An EMPTY LIST MEANS NOTHING IS ALLOWED - this is not a "no restriction" list.
+  host_allowlist: []
+  #   - "wks-lab-*"
+  #   - "srv-lab-*"
+  #   - "lab-lnx-*"
+
+  # Refuse to run against a host that does not look like a lab system.
+  require_lab_tag: true
+
+  # If non-empty, only these techniques may be emulated.
+  technique_allowlist: []
+
+  # Never emulated, whatever a profile says. These are the Impact techniques:
+  # this pipeline validates detection of destruction, it does not perform it.
+  technique_denylist:
+    - T1485   # Data Destruction
+    - T1486   # Data Encrypted for Impact
+    - T1489   # Service Stop
+    - T1490   # Inhibit System Recovery
+    - T1561   # Disk Wipe
+
+  # Tests flagged `destructive: true` additionally require this.
+  allow_destructive: false
+  # Refuse to run a test that cannot undo itself.
+  require_cleanup: true
+  # Abort the run after this many emulation failures.
+  max_failures: 3
+  command_timeout: 2m
+
+# ---------------------------------------------------------------------------
+# Gates - what turns a run into a CI pass or fail.
+# ---------------------------------------------------------------------------
+gates:
+  # 0 disables the threshold. Set these once you have a baseline you trust;
+  # starting strict just teaches people to ignore the build.
+  min_detection_rate: 0
+  min_visibility_rate: 0
+  # A detection that used to fire and no longer does is always worth failing.
+  fail_on_regression: true
+  # Off by default: most libraries have accepted noise before they have
+  # baseline profiles to record it in.
+  fail_on_noise: false
+  fail_on_error: true
+  fail_on_latency_breach: false
+  # A coverage target is an assertion about the whole estate. Most profiles
+  # validate a subset, where the resulting percentage is not comparable to the
+  # target, so this is enabled per-profile rather than globally.
+  fail_on_coverage_target: false
+  # Only cases at or above this severity can fail the build.
+  min_severity: medium
+
+reporting:
+  formats:
+    - json
+    - markdown
+  output_dir: docs/results
+  # Example events attached to each case as evidence.
+  evidence_limit: 3
+  # Field names containing any of these are replaced with [redacted] before
+  # anything is written to disk or the database.
+  redact_fields:
+    - password
+    - passwd
+    - token
+    - secret
+    - apikey
+    - api_key
+    - credential
+    - authorization
+  navigator_layer: true
+
+storage:
+  path: .dvp/dvp.sqlite3
+  retention_days: 365
+  # Set false in regulated environments where matched event content must not
+  # be copied out of the platform.
+  store_evidence: true

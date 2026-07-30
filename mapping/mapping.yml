@@ -1,0 +1,349 @@
+# ATT&CK reference subset
+#
+# This is the join table between adversary techniques, the tactics they serve,
+# and the telemetry sources that can observe them. Three consumers:
+#
+#   * the linter, to reject typo'd or deprecated technique ids
+#   * the coverage report, to know what "complete" would look like
+#   * the gap analyser, to say *which log source* would close a blind spot
+#
+# Only techniques the library targets (and their parents) are listed. Refresh
+# against a new ATT&CK release with `dvp mapping check`, which reports rules
+# referencing ids that are absent here.
+
+version: 1
+attack_version: "v16.1"
+generated_note: >-
+  Curated subset, not a full ATT&CK export. `telemetry` lists the sources in
+  mapping/telemetry_sources.yml that can observe the technique in this estate.
+
+tactics:
+  initial-access: { id: TA0001, name: Initial Access, order: 1 }
+  execution: { id: TA0002, name: Execution, order: 2 }
+  persistence: { id: TA0003, name: Persistence, order: 3 }
+  privilege-escalation: { id: TA0004, name: Privilege Escalation, order: 4 }
+  defense-evasion: { id: TA0005, name: Defense Evasion, order: 5 }
+  credential-access: { id: TA0006, name: Credential Access, order: 6 }
+  discovery: { id: TA0007, name: Discovery, order: 7 }
+  lateral-movement: { id: TA0008, name: Lateral Movement, order: 8 }
+  collection: { id: TA0009, name: Collection, order: 9 }
+  command-and-control: { id: TA0011, name: Command and Control, order: 10 }
+  exfiltration: { id: TA0010, name: Exfiltration, order: 11 }
+  impact: { id: TA0040, name: Impact, order: 12 }
+
+techniques:
+
+  # ------------------------------------------------------ credential access
+  T1003:
+    name: OS Credential Dumping
+    tactics: [credential-access]
+    platforms: [windows, linux, macos]
+    subtechniques: [T1003.001, T1003.002, T1003.003, T1003.006]
+    telemetry: [sysmon_process_access, sysmon_process_creation]
+  T1003.001:
+    name: "OS Credential Dumping: LSASS Memory"
+    parent: T1003
+    tactics: [credential-access]
+    platforms: [windows]
+    telemetry: [sysmon_process_access, sysmon_process_creation]
+  T1003.002:
+    name: "OS Credential Dumping: Security Account Manager"
+    parent: T1003
+    tactics: [credential-access]
+    platforms: [windows]
+    telemetry: [sysmon_process_creation, sysmon_file_create]
+  T1003.003:
+    name: "OS Credential Dumping: NTDS"
+    parent: T1003
+    tactics: [credential-access]
+    platforms: [windows]
+    telemetry: [sysmon_process_creation, sysmon_file_create]
+  T1003.006:
+    name: "OS Credential Dumping: DCSync"
+    parent: T1003
+    tactics: [credential-access]
+    platforms: [windows]
+    telemetry: [windows_security_logon]
+
+  # ------------------------------------------------------------- execution
+  T1059:
+    name: Command and Scripting Interpreter
+    tactics: [execution]
+    platforms: [windows, linux, macos]
+    subtechniques: [T1059.001, T1059.003, T1059.004, T1059.005]
+    telemetry: [sysmon_process_creation, auditd_execve]
+  T1059.001:
+    name: "Command and Scripting Interpreter: PowerShell"
+    parent: T1059
+    tactics: [execution]
+    platforms: [windows]
+    telemetry: [windows_powershell_scriptblock, sysmon_process_creation]
+  T1059.003:
+    name: "Command and Scripting Interpreter: Windows Command Shell"
+    parent: T1059
+    tactics: [execution]
+    platforms: [windows]
+    telemetry: [sysmon_process_creation, windows_security_process_creation]
+  T1059.004:
+    name: "Command and Scripting Interpreter: Unix Shell"
+    parent: T1059
+    tactics: [execution]
+    platforms: [linux, macos]
+    telemetry: [auditd_execve]
+  T1059.005:
+    name: "Command and Scripting Interpreter: Visual Basic"
+    parent: T1059
+    tactics: [execution]
+    platforms: [windows]
+    telemetry: [sysmon_process_creation]
+
+  T1047:
+    name: Windows Management Instrumentation
+    tactics: [execution]
+    platforms: [windows]
+    telemetry: [sysmon_process_creation, windows_security_process_creation]
+
+  # ----------------------------------------------------------- persistence
+  T1053:
+    name: Scheduled Task/Job
+    tactics: [execution, persistence, privilege-escalation]
+    platforms: [windows, linux, macos]
+    subtechniques: [T1053.003, T1053.005]
+    telemetry: [sysmon_process_creation, auditd_file_write]
+  T1053.003:
+    name: "Scheduled Task/Job: Cron"
+    parent: T1053
+    tactics: [execution, persistence, privilege-escalation]
+    platforms: [linux, macos]
+    telemetry: [auditd_file_write, auditd_execve]
+  T1053.005:
+    name: "Scheduled Task/Job: Scheduled Task"
+    parent: T1053
+    tactics: [execution, persistence, privilege-escalation]
+    platforms: [windows]
+    telemetry: [sysmon_process_creation]
+
+  T1543:
+    name: Create or Modify System Process
+    tactics: [persistence, privilege-escalation]
+    platforms: [windows, linux, macos]
+    subtechniques: [T1543.002, T1543.003]
+    telemetry: [windows_system_service_install, auditd_file_write]
+  T1543.002:
+    name: "Create or Modify System Process: Systemd Service"
+    parent: T1543
+    tactics: [persistence, privilege-escalation]
+    platforms: [linux]
+    telemetry: [auditd_file_write]
+  T1543.003:
+    name: "Create or Modify System Process: Windows Service"
+    parent: T1543
+    tactics: [persistence, privilege-escalation]
+    platforms: [windows]
+    telemetry: [windows_system_service_install, sysmon_process_creation]
+
+  T1546:
+    name: Event Triggered Execution
+    tactics: [persistence, privilege-escalation]
+    platforms: [windows, linux, macos]
+    subtechniques: [T1546.003]
+    telemetry: [sysmon_wmi_subscription]
+  T1546.003:
+    name: "Event Triggered Execution: WMI Event Subscription"
+    parent: T1546
+    tactics: [persistence, privilege-escalation]
+    platforms: [windows]
+    telemetry: [sysmon_wmi_subscription]
+
+  T1547:
+    name: Boot or Logon Autostart Execution
+    tactics: [persistence, privilege-escalation]
+    platforms: [windows, linux, macos]
+    subtechniques: [T1547.001]
+    telemetry: [sysmon_registry_set]
+  T1547.001:
+    name: "Boot or Logon Autostart Execution: Registry Run Keys / Startup Folder"
+    parent: T1547
+    tactics: [persistence, privilege-escalation]
+    platforms: [windows]
+    telemetry: [sysmon_registry_set, sysmon_file_create]
+
+  # ---------------------------------------------------- privilege escalation
+  T1548:
+    name: Abuse Elevation Control Mechanism
+    tactics: [privilege-escalation, defense-evasion]
+    platforms: [windows, linux, macos]
+    subtechniques: [T1548.003]
+    telemetry: [auditd_file_write]
+  T1548.003:
+    name: "Abuse Elevation Control Mechanism: Sudo and Sudo Caching"
+    parent: T1548
+    tactics: [privilege-escalation, defense-evasion]
+    platforms: [linux, macos]
+    telemetry: [auditd_file_write, auditd_execve]
+
+  # --------------------------------------------------------- defense evasion
+  T1070:
+    name: Indicator Removal
+    tactics: [defense-evasion]
+    platforms: [windows, linux, macos]
+    subtechniques: [T1070.001, T1070.004]
+    telemetry: [windows_security_log_cleared, sysmon_process_creation]
+  T1070.001:
+    name: "Indicator Removal: Clear Windows Event Logs"
+    parent: T1070
+    tactics: [defense-evasion]
+    platforms: [windows]
+    telemetry: [windows_security_log_cleared, sysmon_process_creation]
+  T1070.004:
+    name: "Indicator Removal: File Deletion"
+    parent: T1070
+    tactics: [defense-evasion]
+    platforms: [windows, linux, macos]
+    telemetry: [sysmon_file_create, auditd_file_write]
+
+  T1218:
+    name: System Binary Proxy Execution
+    tactics: [defense-evasion]
+    platforms: [windows]
+    subtechniques: [T1218.005, T1218.010, T1218.011]
+    telemetry: [sysmon_process_creation]
+  T1218.005:
+    name: "System Binary Proxy Execution: Mshta"
+    parent: T1218
+    tactics: [defense-evasion]
+    platforms: [windows]
+    telemetry: [sysmon_process_creation, sysmon_network_connection]
+  T1218.010:
+    name: "System Binary Proxy Execution: Regsvr32"
+    parent: T1218
+    tactics: [defense-evasion]
+    platforms: [windows]
+    telemetry: [sysmon_process_creation]
+  T1218.011:
+    name: "System Binary Proxy Execution: Rundll32"
+    parent: T1218
+    tactics: [defense-evasion]
+    platforms: [windows]
+    telemetry: [sysmon_process_creation]
+
+  T1562:
+    name: Impair Defenses
+    tactics: [defense-evasion]
+    platforms: [windows, linux, macos, aws, azure, gcp]
+    subtechniques: [T1562.001, T1562.008]
+    telemetry: [windows_defender_operational, aws_cloudtrail_management]
+  T1562.001:
+    name: "Impair Defenses: Disable or Modify Tools"
+    parent: T1562
+    tactics: [defense-evasion]
+    platforms: [windows, linux, macos]
+    telemetry: [windows_defender_operational, sysmon_process_creation]
+  T1562.008:
+    name: "Impair Defenses: Disable or Modify Cloud Logs"
+    parent: T1562
+    tactics: [defense-evasion]
+    platforms: [aws, azure, gcp]
+    telemetry: [aws_cloudtrail_management]
+
+  # -------------------------------------------------------- lateral movement
+  T1021:
+    name: Remote Services
+    tactics: [lateral-movement]
+    platforms: [windows, linux, macos]
+    subtechniques: [T1021.001, T1021.002, T1021.006]
+    telemetry: [windows_security_logon, windows_system_service_install]
+  T1021.001:
+    name: "Remote Services: Remote Desktop Protocol"
+    parent: T1021
+    tactics: [lateral-movement]
+    platforms: [windows]
+    telemetry: [windows_security_logon]
+  T1021.002:
+    name: "Remote Services: SMB/Windows Admin Shares"
+    parent: T1021
+    tactics: [lateral-movement]
+    platforms: [windows]
+    telemetry: [windows_system_service_install, windows_security_logon]
+  T1021.006:
+    name: "Remote Services: Windows Remote Management"
+    parent: T1021
+    tactics: [lateral-movement]
+    platforms: [windows]
+    telemetry: [sysmon_process_creation, windows_security_logon]
+
+  # ------------------------------------------------------------- cloud / IAM
+  T1078:
+    name: Valid Accounts
+    tactics: [initial-access, persistence, privilege-escalation, defense-evasion]
+    platforms: [windows, linux, macos, aws, azure, gcp]
+    subtechniques: [T1078.004]
+    telemetry: [aws_cloudtrail_management, windows_security_logon]
+  T1078.004:
+    name: "Valid Accounts: Cloud Accounts"
+    parent: T1078
+    tactics: [initial-access, persistence, privilege-escalation, defense-evasion]
+    platforms: [aws, azure, gcp]
+    telemetry: [aws_cloudtrail_management]
+
+  T1098:
+    name: Account Manipulation
+    tactics: [persistence, privilege-escalation]
+    platforms: [windows, linux, aws, azure, gcp]
+    subtechniques: [T1098.001, T1098.003]
+    telemetry: [aws_cloudtrail_management]
+  T1098.001:
+    name: "Account Manipulation: Additional Cloud Credentials"
+    parent: T1098
+    tactics: [persistence, privilege-escalation]
+    platforms: [aws, azure, gcp]
+    telemetry: [aws_cloudtrail_management]
+  T1098.003:
+    name: "Account Manipulation: Additional Cloud Roles"
+    parent: T1098
+    tactics: [persistence, privilege-escalation]
+    platforms: [aws, azure, gcp]
+    telemetry: [aws_cloudtrail_management]
+
+  # ---------------------------------------------------------------- discovery
+  T1087:
+    name: Account Discovery
+    tactics: [discovery]
+    platforms: [windows, linux, aws, azure]
+    subtechniques: [T1087.001, T1087.002, T1087.004]
+    telemetry: [sysmon_process_creation, aws_cloudtrail_management]
+  T1087.004:
+    name: "Account Discovery: Cloud Account"
+    parent: T1087
+    tactics: [discovery]
+    platforms: [aws, azure, gcp]
+    telemetry: [aws_cloudtrail_management]
+
+  # ------------------------------------------------------------------ impact
+  # Present so the denylist in config/settings.example.yml resolves to real
+  # ids. These are never emulated by this pipeline.
+  T1485:
+    name: Data Destruction
+    tactics: [impact]
+    platforms: [windows, linux, macos, aws, azure, gcp]
+    telemetry: []
+  T1486:
+    name: Data Encrypted for Impact
+    tactics: [impact]
+    platforms: [windows, linux, macos]
+    telemetry: []
+  T1489:
+    name: Service Stop
+    tactics: [impact]
+    platforms: [windows, linux, macos]
+    telemetry: []
+  T1490:
+    name: Inhibit System Recovery
+    tactics: [impact]
+    platforms: [windows, linux, macos]
+    telemetry: []
+  T1561:
+    name: Disk Wipe
+    tactics: [impact]
+    platforms: [windows, linux, macos]
+    telemetry: []

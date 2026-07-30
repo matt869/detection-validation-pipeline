@@ -1,0 +1,147 @@
+<!--
+  Sysmon configuration for the validation lab.
+
+  Scoped to exactly the events the detection library declares in
+  mapping/telemetry_sources.yml, and no more. A maximal config is not a better
+  config: ProcessAccess unfiltered will bury a SIEM, and the usual response -
+  dropping the whole event ID at the forwarder - is how estates end up blind to
+  credential access while believing they are covered.
+
+  Each section below names the telemetry source it feeds, so a change here can
+  be traced to the rules it affects.
+
+  Install:  sysmon64.exe -accepteula -i sysmon-config.xml
+  Update:   sysmon64.exe -c sysmon-config.xml
+-->
+<Sysmon schemaversion="4.90">
+  <HashAlgorithms>SHA256</HashAlgorithms>
+  <CheckRevocation>False</CheckRevocation>
+  <DnsLookup>False</DnsLookup>
+
+  <EventFiltering>
+
+    <!-- =================================================================
+         EventID 1 - Process Creation        -> sysmon_process_creation
+         Everything is kept. Process creation is the single most valuable
+         endpoint source and the volume is manageable; excluding "noisy"
+         parents is how the living-off-the-land techniques get missed.
+         ================================================================= -->
+    <RuleGroup name="process creation" groupRelation="or">
+      <ProcessCreate onmatch="exclude">
+        <!-- Sysmon's own child processes only. Nothing else is excluded. -->
+        <Image condition="is">C:\Windows\Sysmon64.exe</Image>
+      </ProcessCreate>
+    </RuleGroup>
+
+    <!-- =================================================================
+         EventID 3 - Network Connection      -> sysmon_network_connection
+         Include-only: unfiltered network events dwarf everything else.
+         Scoped to the interpreters and LOLBins the rules care about.
+         ================================================================= -->
+    <RuleGroup name="network connection" groupRelation="or">
+      <NetworkConnect onmatch="include">
+        <Image condition="end with">\powershell.exe</Image>
+        <Image condition="end with">\pwsh.exe</Image>
+        <Image condition="end with">\mshta.exe</Image>
+        <Image condition="end with">\rundll32.exe</Image>
+        <Image condition="end with">\regsvr32.exe</Image>
+        <Image condition="end with">\cscript.exe</Image>
+        <Image condition="end with">\wscript.exe</Image>
+        <Image condition="end with">\certutil.exe</Image>
+        <Image condition="end with">\bitsadmin.exe</Image>
+        <!-- Anything running out of a user-writable directory. -->
+        <Image condition="contains">\AppData\</Image>
+        <Image condition="contains">\Users\Public\</Image>
+        <Image condition="contains">\Windows\Temp\</Image>
+      </NetworkConnect>
+    </RuleGroup>
+
+    <!-- =================================================================
+         EventID 10 - Process Access         -> sysmon_process_access
+         The load-bearing one. Narrowed to LSASS targets, then the known
+         security products are excluded. Without this narrowing the event
+         is unusable at scale, and the usual fix is to drop EID 10
+         entirely - which silently removes the estate's best credential
+         theft detection. See docs/three-state-model.md.
+         ================================================================= -->
+    <RuleGroup name="lsass access" groupRelation="and">
+      <ProcessAccess onmatch="include">
+        <TargetImage condition="image">lsass.exe</TargetImage>
+      </ProcessAccess>
+    </RuleGroup>
+    <RuleGroup name="lsass access exclusions" groupRelation="or">
+      <ProcessAccess onmatch="exclude">
+        <SourceImage condition="end with">\MsMpEng.exe</SourceImage>
+        <SourceImage condition="end with">\MsSense.exe</SourceImage>
+        <SourceImage condition="end with">\SenseIR.exe</SourceImage>
+        <SourceImage condition="end with">\wininit.exe</SourceImage>
+        <SourceImage condition="end with">\csrss.exe</SourceImage>
+        <SourceImage condition="end with">\services.exe</SourceImage>
+        <!-- Handles with no memory-read rights cannot dump credentials. -->
+        <GrantedAccess condition="is">0x1000</GrantedAccess>
+        <GrantedAccess condition="is">0x1400</GrantedAccess>
+      </ProcessAccess>
+    </RuleGroup>
+
+    <!-- =================================================================
+         EventID 11 - File Create            -> sysmon_file_create
+         Include-only: credential material, autostart locations, and
+         script drops.
+         ================================================================= -->
+    <RuleGroup name="file create" groupRelation="or">
+      <FileCreate onmatch="include">
+        <TargetFilename condition="end with">.hive</TargetFilename>
+        <TargetFilename condition="end with">.save</TargetFilename>
+        <TargetFilename condition="end with">.dmp</TargetFilename>
+        <TargetFilename condition="end with">.hta</TargetFilename>
+        <TargetFilename condition="end with">.ps1</TargetFilename>
+        <TargetFilename condition="contains">\Start Menu\Programs\Startup\</TargetFilename>
+        <TargetFilename condition="contains">\System32\Tasks\</TargetFilename>
+        <TargetFilename condition="contains">\Users\Public\</TargetFilename>
+      </FileCreate>
+    </RuleGroup>
+
+    <!-- =================================================================
+         EventID 13 - Registry Value Set     -> sysmon_registry_set
+         Autostart keys and the service configuration hive.
+         ================================================================= -->
+    <RuleGroup name="registry set" groupRelation="or">
+      <RegistryEvent onmatch="include">
+        <TargetObject condition="contains">\CurrentVersion\Run\</TargetObject>
+        <TargetObject condition="contains">\CurrentVersion\RunOnce\</TargetObject>
+        <TargetObject condition="contains">\CurrentVersion\RunServices\</TargetObject>
+        <TargetObject condition="contains">\CurrentVersion\Policies\Explorer\Run\</TargetObject>
+        <TargetObject condition="contains">\CurrentControlSet\Services\</TargetObject>
+        <TargetObject condition="contains">\Windows Defender\Exclusions\</TargetObject>
+        <TargetObject condition="contains">\Image File Execution Options\</TargetObject>
+      </RegistryEvent>
+    </RuleGroup>
+
+    <!-- =================================================================
+         EventID 19/20/21 - WMI              -> sysmon_wmi_subscription
+         Kept in full. Permanent subscriptions are rare, so the volume is
+         near zero and the signal is high. Several vendor configs comment
+         this section out; if yours does, wmi_event_subscription reports
+         BLIND on every run until it is restored.
+         ================================================================= -->
+    <RuleGroup name="wmi" groupRelation="or">
+      <WmiEvent onmatch="exclude" />
+    </RuleGroup>
+
+    <!-- Explicitly disabled: high volume, no rule depends on them today.
+         Turn one on only alongside the rule that will consume it. -->
+    <RuleGroup name="disabled" groupRelation="or">
+      <FileCreateTime onmatch="include" />
+      <RawAccessRead onmatch="include" />
+      <ImageLoad onmatch="include" />
+      <DriverLoad onmatch="include" />
+      <CreateRemoteThread onmatch="include" />
+      <PipeEvent onmatch="include" />
+      <DnsQuery onmatch="include" />
+      <FileDelete onmatch="include" />
+      <ClipboardChange onmatch="include" />
+      <ProcessTampering onmatch="include" />
+    </RuleGroup>
+
+  </EventFiltering>
+</Sysmon>

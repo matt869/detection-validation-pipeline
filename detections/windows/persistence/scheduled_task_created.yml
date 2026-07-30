@@ -1,0 +1,84 @@
+id: b58d0f27-4a13-4c96-85e2-9f7c31d0a8b4
+name: scheduled_task_created
+title: Scheduled task created to run an interpreter or a user-writable payload
+status: production
+severity: medium
+description: >-
+  schtasks.exe created a task whose action is a script interpreter or a binary
+  under a user-writable path. Scheduled tasks survive reboot and run under a
+  chosen account, which makes them the most common persistence mechanism after
+  Run keys. Check the /ru argument: a task created to run as SYSTEM by a
+  non-administrative user is a privilege-escalation attempt.
+author: detection-engineering
+date: 2026-02-05
+references:
+  - https://attack.mitre.org/techniques/T1053/005/
+
+attack:
+  tactics: [persistence, execution, privilege-escalation]
+  techniques: [T1053.005]
+
+platforms: [windows]
+
+logsource:
+  product: windows
+  service: sysmon
+  category: process_creation
+
+telemetry:
+  - sysmon_process_creation
+
+detection:
+  selection_create:
+    EventID: 1
+    Image|endswith: '\schtasks.exe'
+    CommandLine|contains|windash: '-create'
+
+  selection_suspicious_action:
+    CommandLine|contains:
+      - 'powershell'
+      - 'pwsh'
+      - 'cmd.exe /c'
+      - 'cmd /c'
+      - 'mshta'
+      - 'rundll32'
+      - 'wscript'
+      - '\AppData\'
+      - '\Users\Public\'
+      - '\Windows\Temp\'
+
+  filter_management_tooling:
+    ParentImage|endswith:
+      - '\ccmexec.exe'
+      - '\MonitoringHost.exe'
+      - '\msiexec.exe'
+
+  condition: selection_create and selection_suspicious_action and not filter_management_tooling
+
+fields:
+  - Computer
+  - User
+  - CommandLine
+  - ParentImage
+  - ParentCommandLine
+  - IntegrityLevel
+
+falsepositives:
+  - >-
+    Software updaters register PowerShell-based maintenance tasks at install
+    time. They are parented to an installer; excluding the installer is safer
+    than excluding the task name, which an attacker can copy.
+
+validation:
+  emulation:
+    - T1053.005-schtasks-powershell
+  expect: detected
+  max_latency: 5m
+  owner: detection-engineering
+
+tuning:
+  baseline_profile: windows-workstation
+  expected_daily_volume: 2
+
+tags:
+  - purple-team

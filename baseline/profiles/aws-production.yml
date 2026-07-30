@@ -1,0 +1,22 @@
+name: aws-production
+description: >-
+  Production AWS accounts under Control Tower, with all infrastructure changes
+  applied through the Terraform deployment roles. Any control-plane change from
+  a human principal is expected to be rare.
+owner: cloud-security
+hosts:
+  - "aws"
+  - "aws-*"
+# CloudTrail delivery is batched, so a one-hour window can under-count. Two
+# hours keeps the baseline representative without making the run slow.
+window_seconds: 7200
+
+accepted_noise:
+  - rule: iam_privilege_grant
+    max_hits: 2
+    reason: >-
+      The onboarding automation still runs under a legacy role rather than the
+      deployment role. Migration is tracked in CLOUD-2210; until it lands these
+      appear as unexplained grants.
+    owner: cloud-security
+    review_by: "2026-09-30"

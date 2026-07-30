@@ -1,0 +1,17 @@
+scenario: execution-evasion
+description: >-
+  Execution and defence-evasion behaviours on a lab workstation. Note what is
+  *absent*: the Defender exclusion test produced a Sysmon process event but no
+  Microsoft-Windows-Windows Defender/Operational record, because that channel is
+  not forwarded in this estate. That absence is the point - it is what makes
+  defender_exclusion_added resolve to BLIND rather than to a detection failure.
+recorded_at: "2026-05-14T10:03:00Z"
+recorded_from: WKS-LAB-014
+sensor: Sysmon 15.15, PowerShell script block logging enabled
+tests:
+  - T1059.001-powershell-encoded
+  - T1047-wmic-process-call-create
+  - T1218.005-mshta-remote-hta
+  - T1218.011-rundll32-javascript
+  - T1070.001-wevtutil-clear-log
+  - T1562.001-defender-path-exclusion

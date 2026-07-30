@@ -1,0 +1,98 @@
+# Local development environment.
+#
+#   docker compose run --rm dvp doctor
+#   docker compose run --rm dvp run --profile quick-smoke
+#   docker compose up dashboard      # http://127.0.0.1:8787
+#
+# The default `dvp` service is fully offline: it replays the recorded corpora in
+# fixtures/runs and needs no SIEM. The `splunk` profile brings up a real
+# instance for validating the compiled SPL against something that can reject it:
+#
+#   docker compose --profile siem up -d splunk
+#
+# No credentials live in this file. Put them in a .env alongside it (git-ignored)
+# and let config/backends.yml resolve them through ${ENV:...}.
+
+name: detection-validation-pipeline
+
+services:
+
+  dvp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dvp:local
+    working_dir: /opt/dvp
+    # Content is bind-mounted so editing a rule on the host takes effect
+    # immediately - the inner loop here is editing YAML, not rebuilding.
+    volumes:
+      - ./detections:/opt/dvp/detections:ro
+      - ./mapping:/opt/dvp/mapping:ro
+      - ./fixtures:/opt/dvp/fixtures:ro
+      - ./config:/opt/dvp/config:ro
+      - ./baseline:/opt/dvp/baseline:ro
+      - ./docs/results:/opt/dvp/docs/results
+      - dvp-state:/opt/dvp/.dvp
+    environment:
+      DVP_ROOT: /opt/dvp
+      NO_COLOR: "1"
+      PYTHONUNBUFFERED: "1"
+      DVP_OPERATOR: docker
+    env_file:
+      - path: .env
+        required: false
+    # Emulation is never enabled in a container: the container is not the host
+    # whose telemetry is being validated, so executing here would prove nothing.
+    # Offline replay is the whole point of this service.
+    command: ["run", "--profile", "quick-smoke"]
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  dashboard:
+    extends:
+      service: dvp
+    command: ["dashboard", "--host", "0.0.0.0", "--port", "8787"]
+    ports:
+      # Bound to loopback deliberately. The dashboard has no authentication;
+      # see docs/threat-model.md before changing this.
+      - "127.0.0.1:8787:8787"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8787/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # Optional: a real Splunk to validate compiled SPL against.
+  # Not part of the default stack - it needs 2GB+ of RAM and a licence accept.
+  splunk:
+    profiles: ["siem"]
+    image: splunk/splunk:latest
+    environment:
+      SPLUNK_START_ARGS: "--accept-license"
+      SPLUNK_PASSWORD: ${SPLUNK_PASSWORD:?set SPLUNK_PASSWORD in .env}
+      SPLUNK_HEC_TOKEN: ${SPLUNK_HEC_TOKEN:-00000000-0000-0000-0000-000000000000}
+    ports:
+      - "127.0.0.1:8000:8000"   # web
+      - "127.0.0.1:8089:8089"   # management API - what the backend talks to
+      - "127.0.0.1:8088:8088"   # HEC - for loading fixture events
+    volumes:
+      - splunk-var:/opt/splunk/var
+      - splunk-etc:/opt/splunk/etc
+    healthcheck:
+      test: ["CMD", "curl", "-fk", "https://localhost:8089/services/server/info"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
+
+volumes:
+  dvp-state:
+  splunk-var:
+  splunk-etc:

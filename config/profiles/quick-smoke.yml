@@ -1,0 +1,56 @@
+# The profile CI runs on every pull request.
+#
+# Deliberately narrow and fully offline: it replays recorded telemetry, so it
+# finishes in seconds and cannot be flaky because a SIEM was slow. Its job is to
+# catch "somebody broke a rule", not to measure the estate.
+#
+#   dvp run --profile quick-smoke
+
+name: quick-smoke
+description: >-
+  Fast offline regression check across the highest-value detections. Replays
+  recorded telemetry - no lab, no credentials, no emulation executed.
+owner: detection-engineering
+backend: fixture
+
+select:
+  statuses: [production]
+  min_severity: high
+  tags: [purple-team]
+
+# Corpora to load. Listing them explicitly rather than loading everything is a
+# guard: if a rule selected above has no recorded telemetry here, it reports
+# BLIND and the omission shows up as a result rather than passing silently.
+scenarios:
+  - credential-theft
+  - execution-evasion
+  - persistence
+  - lateral-movement
+  - linux-server
+  - aws-control-plane
+  - baseline
+
+timing:
+  # Nothing is executed and nothing is ingested, so none of the live-run
+  # patience applies.
+  ingest_lag: 0s
+  max_wait: 0s
+  inter_test_delay: 0s
+
+gates:
+  # A PR must not make a working detection stop working.
+  fail_on_regression: true
+  fail_on_error: true
+  # Rates are not asserted here: this profile is a subset, so its detection
+  # rate is not a meaningful estate-wide number. See the scheduled profiles.
+  min_detection_rate: 0
+  min_visibility_rate: 0
+  min_severity: high
+
+formats:
+  - json
+  - markdown
+
+tags:
+  - ci
+  - offline

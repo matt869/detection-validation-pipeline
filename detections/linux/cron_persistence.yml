@@ -1,0 +1,84 @@
+id: 0b6e3f18-7a24-4d95-a3c0-8e51fb27d40c
+name: cron_persistence
+title: Cron entry created or modified outside configuration management
+status: production
+severity: medium
+description: >-
+  A file under a cron directory was written, or crontab was invoked to edit a
+  schedule, by something other than the configuration management agent. Cron is
+  the simplest durable persistence on Linux and is frequently the first thing an
+  intruder establishes. Read the new entry: the schedule tells you when it fires
+  and the command tells you what it does.
+author: detection-engineering
+date: 2026-02-28
+references:
+  - https://attack.mitre.org/techniques/T1053/003/
+
+attack:
+  tactics: [persistence, execution, privilege-escalation]
+  techniques: [T1053.003]
+
+platforms: [linux]
+
+logsource:
+  product: linux
+  service: auditd
+
+telemetry:
+  - auditd_file_write
+  - auditd_execve
+
+detection:
+  selection_cron_file_written:
+    type: PATH
+    name|startswith:
+      - '/etc/cron'
+      - '/var/spool/cron'
+      - '/etc/at'
+    nametype:
+      - CREATE
+      - NORMAL
+
+  selection_crontab_edit:
+    type: EXECVE
+    cmdline|contains:
+      - 'crontab -'
+
+  filter_configuration_management:
+    exe|endswith:
+      - '/puppet'
+      - '/ansible'
+      - '/chef-client'
+      - '/salt-minion'
+      - '/cfengine'
+
+  condition: 1 of selection_* and not filter_configuration_management
+
+fields:
+  - host
+  - auid
+  - uid
+  - exe
+  - cmdline
+  - name
+  - key
+
+falsepositives:
+  - >-
+    Package installation drops files into /etc/cron.d. Excluded indirectly when
+    the package manager runs under configuration management; standalone dpkg or
+    rpm invocations will still alert, which is intentional on a server.
+
+validation:
+  emulation:
+    - T1053.003-cron-drop
+  expect: detected
+  max_latency: 5m
+  owner: linux-platform
+
+tuning:
+  baseline_profile: linux-server
+  expected_daily_volume: 2
+
+tags:
+  - purple-team

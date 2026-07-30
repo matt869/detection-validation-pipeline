@@ -1,0 +1,106 @@
+id: 6b1f0c2a-9d43-4a17-9f0e-3c2b5a71d804
+name: lsass_memory_access
+title: LSASS process memory accessed with credential-dumping rights
+status: production
+severity: critical
+description: >-
+  A process opened a handle to lsass.exe with read-memory rights, or invoked the
+  comsvcs.dll MiniDump export against it. This is how almost every credential
+  theft tool reads cached secrets out of memory. Triage by identifying the
+  source image and whether it is a known security product; anything else on a
+  workstation should be treated as an active intrusion until proven otherwise.
+author: detection-engineering
+date: 2026-01-12
+modified: 2026-03-04
+references:
+  - https://attack.mitre.org/techniques/T1003/001/
+  - https://www.microsoft.com/security/blog/2022/10/17/defenders-guide-to-lsass/
+
+attack:
+  tactics: [credential-access]
+  techniques: [T1003.001]
+
+platforms: [windows]
+
+logsource:
+  product: windows
+  service: sysmon
+  category: process_access
+
+telemetry:
+  - sysmon_process_access
+  - sysmon_process_creation
+
+detection:
+  # Direct handle open against LSASS with rights sufficient to read memory.
+  selection_handle:
+    EventID: 10
+    TargetImage|endswith: '\lsass.exe'
+    GrantedAccess:
+      - '0x1010'   # PROCESS_VM_READ | PROCESS_QUERY_LIMITED_INFORMATION
+      - '0x1038'
+      - '0x1410'   # classic ProcDump / Mimikatz mask
+      - '0x1438'
+      - '0x143a'
+      - '0x1fffff' # PROCESS_ALL_ACCESS
+
+  # Living-off-the-land variant that never opens a handle we would otherwise see
+  # under this rule's own EventID 10 filter.
+  selection_comsvcs:
+    EventID: 1
+    Image|endswith: '\rundll32.exe'
+    CommandLine|contains|all:
+      - 'comsvcs'
+      - 'MiniDump'
+
+  # Security tooling and the OS legitimately read LSASS. Keep these here rather
+  # than in the selections so tuning never edits detection logic.
+  filter_known_good:
+    SourceImage|endswith:
+      - '\MsMpEng.exe'
+      - '\MsSense.exe'
+      - '\wmiprvse.exe'
+      - '\csrss.exe'
+      - '\wininit.exe'
+      - '\services.exe'
+      - '\taskmgr.exe'
+
+  condition: 1 of selection_* and not filter_known_good
+
+fields:
+  - Computer
+  - SourceImage
+  - SourceUser
+  - TargetImage
+  - GrantedAccess
+  - CallTrace
+  - CommandLine
+
+falsepositives:
+  - >-
+    EDR and AV agents read LSASS during scans. These are excluded by
+    filter_known_good; a new security product needs adding there.
+  - >-
+    Crash-dump collection by Windows Error Reporting (werfault.exe) after a
+    genuine LSASS fault. Rare, and correlates with an application error event.
+
+validation:
+  emulation:
+    - T1003.001-lsass-handle-open
+    - T1003.001-comsvcs-minidump
+  expect: detected
+  max_latency: 3m
+  owner: detection-engineering
+
+tuning:
+  baseline_profile: windows-workstation
+  expected_daily_volume: 0
+  notes:
+    - >-
+      GrantedAccess is an exact match list rather than a bitmask test because
+      neither Sigma nor the target query languages can express bitwise AND.
+      Review the list whenever a new dumping technique is published.
+
+tags:
+  - purple-team
+  - crown-jewel

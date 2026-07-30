@@ -1,0 +1,155 @@
+# Coverage targets
+#
+# What "good" looks like, declared up front. Without this file a coverage report
+# is just a number; with it, the report can say whether the number is acceptable
+# and which specific technique is dragging a tactic below target.
+#
+# Targets are deliberately below 100%. A team that claims full ATT&CK coverage
+# is measuring rule *existence*, not detection efficacy - and this pipeline
+# measures efficacy, so the numbers are lower and mean more.
+#
+# `detected` is the fraction of validation cases for a technique whose outcome
+# was DETECTED. `visible` is the fraction that were not BLIND, i.e. the
+# telemetry arrived whether or not a rule fired.
+
+version: 1
+review_cadence: quarterly
+owner: detection-engineering
+
+# Applied when a tactic or technique has no explicit entry.
+defaults:
+  detected: 0.70
+  visible: 0.90
+  #: Techniques rated this priority or above must have at least one rule.
+  require_rule_above_priority: high
+
+# Priority reflects this estate's threat model (see docs/threat-model.md),
+# not a generic ranking.
+tactics:
+  credential-access:
+    priority: critical
+    detected: 0.90
+    visible: 1.00
+    rationale: >-
+      Credential theft is the pivot point for every intrusion we have handled.
+      A blind spot here converts a single compromised host into a domain-wide
+      incident, so telemetry coverage must be total.
+
+  execution:
+    priority: critical
+    detected: 0.85
+    visible: 1.00
+    rationale: First reliable observation point for most intrusions.
+
+  persistence:
+    priority: high
+    detected: 0.80
+    visible: 0.95
+    rationale: >-
+      Persistence is what turns an incident into a repeat incident. Detection
+      can lag slightly; visibility cannot.
+
+  defense-evasion:
+    priority: high
+    detected: 0.70
+    visible: 0.95
+    rationale: >-
+      Broad and partly unobservable by design. We target high visibility and
+      accept that some sub-techniques will only ever be caught in retrospect.
+
+  lateral-movement:
+    priority: high
+    detected: 0.75
+    visible: 0.95
+
+  privilege-escalation:
+    priority: high
+    detected: 0.70
+    visible: 0.90
+
+  initial-access:
+    priority: medium
+    detected: 0.60
+    visible: 0.85
+    rationale: >-
+      Largely handled by perimeter and email controls that report elsewhere;
+      this pipeline covers the endpoint-observable subset only.
+
+  discovery:
+    priority: medium
+    detected: 0.50
+    visible: 0.85
+    rationale: >-
+      High benign base rate. We deliberately accept lower detection here rather
+      than drown the queue; discovery is used for corroboration, not alerting.
+
+  collection:
+    priority: medium
+    detected: 0.50
+    visible: 0.80
+
+  command-and-control:
+    priority: high
+    detected: 0.65
+    visible: 0.90
+
+  exfiltration:
+    priority: high
+    detected: 0.60
+    visible: 0.90
+
+  impact:
+    priority: critical
+    detected: 0.85
+    visible: 1.00
+    rationale: >-
+      Emulated only through non-destructive proxies - see the technique
+      denylist in config/settings.example.yml. Detection is validated against
+      precursor behaviour, never against real destruction.
+
+# Per-technique overrides where the tactic-level target is the wrong bar.
+techniques:
+  T1003.001:
+    priority: critical
+    detected: 1.00
+    visible: 1.00
+    rationale: LSASS access is the single most load-bearing detection we own.
+
+  T1059.001:
+    priority: critical
+    detected: 0.95
+    visible: 1.00
+
+  T1562.008:
+    priority: critical
+    detected: 1.00
+    visible: 1.00
+    rationale: >-
+      If cloud logging can be disabled without an alert, every other cloud
+      detection becomes unreliable.
+
+  T1021.001:
+    priority: medium
+    detected: 0.50
+    visible: 0.95
+    rationale: >-
+      RDP is ubiquitous in this estate. We measure visibility strictly and
+      accept low alerting precision until jump-host segmentation lands.
+
+  T1087:
+    priority: low
+    detected: 0.30
+    visible: 0.75
+    rationale: Enumeration is noisy; used for post-hoc scoping, not alerting.
+
+# Techniques we have consciously decided not to pursue. Listing them keeps them
+# out of the "unmapped" bucket and forces the decision to be revisited.
+excluded:
+  - technique: T1204
+    reason: >-
+      User execution is covered by the email security platform; duplicating it
+      here would produce two alerts for one event.
+    review_by: "2026-12-31"
+  - technique: T1566
+    reason: Phishing detection is owned by the email security team.
+    review_by: "2026-12-31"

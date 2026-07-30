@@ -1,0 +1,74 @@
+id: 8e5a2c94-1f76-40b3-b8d7-63920ae4c1f8
+name: sudoers_modified
+title: Sudoers policy modified outside configuration management
+status: production
+severity: high
+description: >-
+  /etc/sudoers or a file under /etc/sudoers.d was written by something other
+  than the configuration management agent. Granting NOPASSWD to a controlled
+  account is one of the quietest ways to hold privileged access on a Linux host,
+  because nothing about the account itself looks unusual afterwards. Diff the
+  file against the configuration management source of truth.
+author: detection-engineering
+date: 2026-03-08
+references:
+  - https://attack.mitre.org/techniques/T1548/003/
+
+attack:
+  tactics: [privilege-escalation, defense-evasion]
+  techniques: [T1548.003]
+
+platforms: [linux]
+
+logsource:
+  product: linux
+  service: auditd
+
+telemetry:
+  - auditd_file_write
+
+detection:
+  selection:
+    type: PATH
+    name|startswith:
+      - '/etc/sudoers'
+    nametype:
+      - CREATE
+      - NORMAL
+
+  filter_configuration_management:
+    exe|endswith:
+      - '/puppet'
+      - '/ansible'
+      - '/chef-client'
+      - '/salt-minion'
+
+  condition: selection and not filter_configuration_management
+
+fields:
+  - host
+  - auid
+  - uid
+  - exe
+  - cmdline
+  - name
+
+falsepositives:
+  - >-
+    visudo used by an administrator during an approved change. The audit record
+    still shows the editing user; correlate against the change record rather
+    than excluding visudo, which an attacker can also invoke.
+
+validation:
+  emulation:
+    - T1548.003-sudoers-nopasswd
+  expect: detected
+  max_latency: 5m
+  owner: linux-platform
+
+tuning:
+  baseline_profile: linux-server
+  expected_daily_volume: 0
+
+tags:
+  - purple-team

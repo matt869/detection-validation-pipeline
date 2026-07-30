@@ -1,0 +1,76 @@
+id: 5a9e2c48-7f31-4d6b-a0c7-2e83b6f14970
+name: mshta_remote_payload
+title: mshta.exe executed remote or inline script content
+status: production
+severity: high
+description: >-
+  mshta.exe was launched with a URL, a UNC path, or an inline script scheme.
+  mshta is a signed Microsoft binary that executes arbitrary HTML applications,
+  so it is used to run payloads without dropping an executable. Local .hta files
+  from a software vendor are the only routine use; anything network-sourced is
+  worth a full investigation.
+author: detection-engineering
+date: 2026-02-02
+references:
+  - https://attack.mitre.org/techniques/T1218/005/
+
+attack:
+  tactics: [defense-evasion]
+  techniques: [T1218.005]
+
+platforms: [windows]
+
+logsource:
+  product: windows
+  service: sysmon
+  category: process_creation
+
+telemetry:
+  - sysmon_process_creation
+
+detection:
+  selection_process:
+    EventID: 1
+    Image|endswith: '\mshta.exe'
+
+  selection_remote_content:
+    CommandLine|contains:
+      - 'http://'
+      - 'https://'
+      - 'ftp://'
+      - 'javascript:'
+      - 'vbscript:'
+      - '\\\\'
+
+  filter_vendor_hta:
+    CommandLine|contains:
+      - 'C:\Program Files\Contoso\'
+
+  condition: selection_process and selection_remote_content and not filter_vendor_hta
+
+fields:
+  - Computer
+  - User
+  - CommandLine
+  - ParentImage
+  - ParentCommandLine
+
+falsepositives:
+  - >-
+    A small number of line-of-business applications ship .hta helpers served
+    from an internal web server. Exclude by full path, never by hostname alone.
+
+validation:
+  emulation:
+    - T1218.005-mshta-remote-hta
+  expect: detected
+  max_latency: 3m
+  owner: detection-engineering
+
+tuning:
+  baseline_profile: windows-workstation
+  expected_daily_volume: 0
+
+tags:
+  - purple-team
+  - lolbin

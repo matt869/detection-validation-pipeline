@@ -1,0 +1,84 @@
+id: c0e6b842-3f79-4a15-88d1-5be207c94f3a
+name: rdp_logon_from_workstation
+title: Interactive RDP logon sourced from outside the jump-host range
+status: production
+severity: medium
+description: >-
+  A LogonType 10 (RemoteInteractive) session was established from an address
+  outside the administrative jump-host range. Administrative RDP is supposed to
+  originate only from the jump hosts; anything else is either a policy
+  violation or an attacker moving with stolen credentials.
+author: detection-engineering
+date: 2026-03-12
+modified: 2026-07-01
+references:
+  - https://attack.mitre.org/techniques/T1021/001/
+
+attack:
+  tactics: [lateral-movement]
+  techniques: [T1021.001]
+
+platforms: [windows]
+
+logsource:
+  product: windows
+  service: security
+
+telemetry:
+  - windows_security_logon
+
+detection:
+  selection:
+    EventID: 4624
+    LogonType: 10
+
+  # This range is far wider than it should be. Narrowing it to the actual jump
+  # hosts (10.20.30.0/24) is the whole point of SEC-3902; until then the
+  # exclusion swallows genuine lateral movement, which is why this rule's
+  # expected outcome is `visible` rather than `detected`.
+  filter_admin_sources:
+    IpAddress|cidr: '10.0.0.0/8'
+
+  condition: selection and not filter_admin_sources
+
+fields:
+  - Computer
+  - TargetUserName
+  - TargetDomainName
+  - IpAddress
+  - WorkstationName
+  - LogonType
+
+falsepositives:
+  - >-
+    Support staff connecting from the VPN pool, which is currently inside the
+    excluded range. Narrowing the exclusion will surface these; they need to be
+    moved behind the jump hosts, not re-excluded.
+
+validation:
+  emulation:
+    - T1021.001-rdp-interactive-logon
+  # The telemetry arrives; the rule deliberately does not fire on it yet. That
+  # is a detection gap we have accepted and dated, so it reports PASS - but it
+  # stays visible in every report until the exclusion is narrowed.
+  expect: visible
+  justification: >-
+    filter_admin_sources currently excludes all of RFC1918 10/8 because jump-host
+    segmentation is incomplete (SEC-3902, due 2026-Q4). We validate that the
+    4624 telemetry is present and correctly shaped so that narrowing the
+    exclusion is a one-line change with known-good data behind it.
+  owner: detection-engineering
+  max_latency: 5m
+
+tuning:
+  baseline_profile: windows-server
+  expected_daily_volume: 0
+  notes:
+    - >-
+      When SEC-3902 completes, change the CIDR to 10.20.30.0/24 and set
+      `expect: detected`. The pipeline will fail the build if the change does
+      not actually start catching the emulated logon.
+
+tags:
+  - purple-team
+  - known-gap

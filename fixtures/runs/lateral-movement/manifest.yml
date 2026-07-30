@@ -1,0 +1,13 @@
+scenario: lateral-movement
+description: >-
+  Service-based remote execution and an interactive RDP session. The RDP logon
+  is recorded from 10.10.5.44, which sits inside the over-broad exclusion in
+  rdp_logon_from_workstation - so the telemetry is present and the rule
+  correctly does not fire. That combination is exactly the VISIBLE state the
+  three-state model exists to name.
+recorded_at: "2026-05-14T13:41:00Z"
+recorded_from: SRV-LAB-APP2
+sensor: Windows System and Security channels via WEF
+tests:
+  - T1021.002-service-remote-exec
+  - T1021.001-rdp-interactive-logon

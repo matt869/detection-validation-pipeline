@@ -1,0 +1,78 @@
+id: 1e7b93c0-5a48-4f2d-8e61-04c9d7a2b5f8
+name: eventlog_cleared
+title: Windows event log cleared
+status: production
+severity: high
+description: >-
+  A Windows event log was cleared, either through the audit-log-cleared event
+  itself or through the tooling that does it. On a server this is close to never
+  legitimate. Treat the clearing account as compromised and pivot to what the
+  log would have contained: reconstruct the window from forwarded copies, since
+  clearing the local log does not remove events already shipped.
+author: detection-engineering
+date: 2026-01-15
+references:
+  - https://attack.mitre.org/techniques/T1070/001/
+
+attack:
+  tactics: [defense-evasion]
+  techniques: [T1070.001]
+
+platforms: [windows]
+
+logsource:
+  product: windows
+  service: security
+
+telemetry:
+  - windows_security_log_cleared
+  - sysmon_process_creation
+
+detection:
+  # The authoritative signal: Windows records this before wiping the log.
+  selection_audit_log_cleared:
+    EventID: 1102
+
+  # Catches the attempt even when the target channel is not the Security log.
+  selection_clearing_tooling:
+    EventID: 1
+    CommandLine|contains:
+      - 'wevtutil clear-log'
+      - 'wevtutil cl '
+      - 'Clear-EventLog'
+      - 'Remove-EventLog'
+      - 'Limit-EventLog'
+
+  filter_log_rotation_jobs:
+    ParentImage|endswith:
+      - '\LogRotate.exe'
+
+  condition: 1 of selection_* and not filter_log_rotation_jobs
+
+fields:
+  - Computer
+  - SubjectUserName
+  - SubjectDomainName
+  - CommandLine
+  - ParentImage
+
+falsepositives:
+  - >-
+    Imaging and decommissioning workflows clear logs deliberately. These should
+    be identifiable by host and by a maintenance window - if they are not,
+    that is itself worth fixing.
+
+validation:
+  emulation:
+    - T1070.001-wevtutil-clear-log
+  expect: detected
+  max_latency: 2m
+  owner: detection-engineering
+
+tuning:
+  baseline_profile: windows-server
+  expected_daily_volume: 0
+
+tags:
+  - purple-team
+  - anti-forensics

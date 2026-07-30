@@ -1,0 +1,21 @@
+name: windows-server
+description: >-
+  Windows Server 2022 application and domain infrastructure. Quieter than a
+  workstation and held to a stricter standard: an administrative action on a
+  server should be rare enough to be individually explainable.
+owner: platform-engineering
+hosts:
+  - "srv-*"
+  - "dc*"
+  - "jmp-*"
+window_seconds: 3600
+
+accepted_noise:
+  - rule: psexec_service_install
+    max_hits: 1
+    reason: >-
+      The vulnerability scanner installs a transient service during
+      authenticated checks, from a fixed source address. Accepted at one per
+      window; a second concurrent install is not the scanner.
+    owner: platform-engineering
+    review_by: "2026-09-15"

@@ -1,0 +1,68 @@
+# Telemetry backends.
+#
+# Safe to commit: every credential is a ${ENV:NAME} reference resolved at load
+# time. A referenced variable that is not set is a startup error, not a silent
+# empty string - failing at startup beats a run that reports everything blind
+# because the token was missing.
+#
+# Check reachability with: dvp doctor --backends
+
+backends:
+
+  # Offline replay of the corpora in fixtures/runs/. Always available, needs no
+  # infrastructure, and is what CI and the test suite use.
+  fixture:
+    kind: fixture
+    enabled: true
+    time_field: _time
+    max_results: 500
+    options:
+      path: fixtures/runs
+
+  splunk:
+    kind: splunk
+    enabled: false
+    time_field: _time
+    timeout: 90s
+    max_results: 500
+    # AND-ed into every query. Keep validation traffic scoped to the lab so a
+    # mistuned rule cannot pull production data into a report.
+    scope_filter: 'index IN (windows, linux, cloudtrail)'
+    options:
+      url: ${ENV:SPLUNK_URL:-https://splunk.lab.example:8089}
+      token: ${ENV:SPLUNK_TOKEN:-}
+      # Basic auth is used only when no token is set.
+      username: ${ENV:SPLUNK_USERNAME:-}
+      password: ${ENV:SPLUNK_PASSWORD:-}
+      # `fast` skips field discovery the harness does not need.
+      search_level: fast
+      verify_tls: true
+      # ca_bundle: /etc/ssl/certs/lab-ca.pem
+
+  elastic:
+    kind: elastic
+    enabled: false
+    time_field: "@timestamp"
+    timeout: 60s
+    max_results: 500
+    options:
+      url: ${ENV:ELASTIC_URL:-https://elastic.lab.example:9200}
+      api_key: ${ENV:ELASTIC_API_KEY:-}
+      username: ${ENV:ELASTIC_USERNAME:-}
+      password: ${ENV:ELASTIC_PASSWORD:-}
+      index: "logs-*,winlogbeat-*,auditbeat-*"
+      verify_tls: true
+
+  sentinel:
+    kind: sentinel
+    enabled: false
+    time_field: TimeGenerated
+    timeout: 120s
+    max_results: 500
+    options:
+      url: https://api.loganalytics.io
+      workspace_id: ${ENV:AZURE_WORKSPACE_ID:-}
+      # Refresh with:
+      #   az account get-access-token --resource https://api.loganalytics.io
+      # Deliberately not a client secret: this tool should not hold one.
+      token: ${ENV:AZURE_ACCESS_TOKEN:-}

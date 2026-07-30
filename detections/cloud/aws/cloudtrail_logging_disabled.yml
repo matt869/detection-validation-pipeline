@@ -1,0 +1,86 @@
+id: f3082b5a-9e41-4d67-a0c2-74b158e39d0f
+name: cloudtrail_logging_disabled
+title: CloudTrail logging stopped, deleted, or narrowed
+status: production
+severity: critical
+description: >-
+  A CloudTrail trail was stopped, deleted, or reconfigured. Every other cloud
+  detection depends on this trail, so tampering with it is both an evasion step
+  and a reliable indicator on its own - there is no benign reason for it to
+  happen outside a reviewed infrastructure change. Restore logging first, then
+  investigate the gap the change would have created.
+author: cloud-security
+date: 2026-01-30
+references:
+  - https://attack.mitre.org/techniques/T1562/008/
+
+attack:
+  tactics: [defense-evasion]
+  techniques: [T1562.008]
+
+platforms: [aws]
+
+logsource:
+  product: aws
+  service: cloudtrail
+
+telemetry:
+  - aws_cloudtrail_management
+
+detection:
+  selection:
+    eventSource: cloudtrail.amazonaws.com
+    eventName:
+      - StopLogging
+      - DeleteTrail
+      - UpdateTrail
+      - PutEventSelectors
+      - RemoveTags
+
+  # A denied call is a signal too, but it belongs to a different rule with a
+  # different response. Excluding it here keeps this alert unambiguous.
+  filter_denied:
+    errorCode|exists: true
+
+  # Trail changes made by the infrastructure pipeline are reviewed at merge.
+  filter_infrastructure_pipeline:
+    userIdentity.arn|contains:
+      - ':assumed-role/terraform-cloudtrail-deploy/'
+
+  condition: selection and not 1 of filter_*
+
+fields:
+  - eventTime
+  - eventName
+  - awsRegion
+  - userIdentity.arn
+  - userIdentity.type
+  - sourceIPAddress
+  - userAgent
+  - requestParameters
+  - recipientAccountId
+
+falsepositives:
+  - >-
+    The infrastructure pipeline updating trail configuration, excluded by role
+    ARN. If someone assumes that role interactively the alert will not fire -
+    which is why interactive assumption of deploy roles is separately alerted.
+
+validation:
+  emulation:
+    - T1562.008-cloudtrail-stop-logging
+  expect: detected
+  max_latency: 15m
+  owner: cloud-security
+
+tuning:
+  baseline_profile: aws-production
+  expected_daily_volume: 0
+  notes:
+    - >-
+      CloudTrail delivery is batched; the 15 minute latency budget reflects
+      delivery lag, not detection lag. Do not tighten it without measuring.
+
+tags:
+  - purple-team
+  - crown-jewel

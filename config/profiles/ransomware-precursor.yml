@@ -1,0 +1,65 @@
+# Ransomware precursor chain.
+#
+# The encryption itself is never emulated - T1486 and its neighbours are on the
+# permanent technique denylist. What this profile validates is the sequence that
+# reliably precedes it: get credentials, blind the defences, establish
+# persistence, move laterally, clear the logs.
+#
+# That is the useful place to detect ransomware anyway. By the time files are
+# being encrypted, detection has already failed.
+
+name: ransomware-precursor
+description: >-
+  The behaviour chain that precedes encryption: credential access, defence
+  impairment, persistence, lateral movement, and log clearing. Encryption
+  itself is never emulated.
+owner: detection-engineering
+
+select:
+  techniques:
+    - T1003.001   # LSASS memory - the initial credential grab
+    - T1003.002   # SAM hive export
+    - T1562.001   # Defender exclusions added before staging the payload
+    - T1547.001   # Run key persistence
+    - T1543.003   # Service persistence
+    - T1053.005   # Scheduled task persistence
+    - T1021.001   # RDP lateral movement - currently a documented detection gap
+    - T1021.002   # SMB/admin share lateral movement
+    - T1070.001   # Event log clearing
+  statuses: [production]
+
+scenarios:
+  - credential-theft
+  - execution-evasion
+  - persistence
+  - lateral-movement
+  - baseline
+
+timing:
+  ingest_lag: 90s
+  max_wait: 10m
+  inter_test_delay: 45s
+
+gates:
+  # Log clearing and defence impairment are the steps most likely to be
+  # invisible rather than merely undetected, so visibility carries the higher
+  # bar here too.
+  min_visibility_rate: 95%
+  min_detection_rate: 80%
+  fail_on_regression: true
+  fail_on_noise: false
+  # This profile spans a whole attack chain, so its coverage percentages are
+  # comparable to the targets in mapping/coverage_targets.yml.
+  fail_on_coverage_target: true
+  min_severity: high
+
+formats:
+  - json
+  - markdown
+  - html
+  - navigator
+
+tags:
+  - purple-team
+  - scheduled
+  - executive-report

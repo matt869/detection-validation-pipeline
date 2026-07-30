@@ -1,0 +1,102 @@
+# Provision the telemetry the detection library depends on.
+#
+# Everything in mapping/telemetry_sources.yml has to come from somewhere. This
+# playbook is that somewhere for the Linux hosts: without it, every Linux rule
+# in the library reports BLIND, which is a true result and a useless one.
+#
+#   ansible-playbook -i inventory.ini telemetry.yml --check
+#   ansible-playbook -i inventory.ini telemetry.yml
+#
+# Inventory is expected to use a `lab` group. The safety policy refuses to
+# emulate against hosts that do not look like lab systems, so pointing this at
+# production would provision telemetry that the pipeline then declines to test.
+
+- name: Configure Linux audit telemetry
+  hosts: lab
+  become: true
+
+  vars:
+    dvp_audit_rules_dest: /etc/audit/rules.d/50-dvp.rules
+    # Matches the -b value in auditd.rules. Set generously: a dropped audit
+    # record is indistinguishable from a behaviour that never happened.
+    dvp_audit_backlog: 8192
+
+  handlers:
+    - name: reload audit rules
+      # augenrules, not `service auditd restart`: on most distributions the
+      # unit refuses a plain restart, and a failed restart leaves auditing off.
+      ansible.builtin.command: augenrules --load
+      changed_when: true
+      # -e 2 makes the rule set immutable until reboot, so a reload after the
+      # first apply is expected to fail. Report it rather than failing the play.
+      failed_when: false
+      register: dvp_augenrules
+
+    - name: warn if rules are locked
+      ansible.builtin.debug:
+        msg: >-
+          Audit rules are immutable (-e 2) and could not be reloaded in place.
+          Reboot this host to apply the new rule set.
+      when: dvp_augenrules.rc | default(0) != 0
+
+  tasks:
+    - name: Install auditd
+      ansible.builtin.package:
+        name:
+          - auditd
+          - audispd-plugins
+        state: present
+
+    - name: Deploy audit rules
+      ansible.builtin.copy:
+        src: auditd.rules
+        dest: "{{ dvp_audit_rules_dest }}"
+        owner: root
+        group: root
+        mode: "0640"
+      notify: reload audit rules
+
+    - name: Raise the audit backlog limit
+      ansible.builtin.lineinfile:
+        path: /etc/audit/auditd.conf
+        regexp: '^\s*#?\s*max_log_file_action\s*='
+        line: "max_log_file_action = ROTATE"
+        state: present
+
+    - name: Ensure auditd is running and enabled
+      ansible.builtin.service:
+        name: auditd
+        state: started
+        enabled: true
+
+    # Verification is part of provisioning, not a separate step. A host where
+    # the rules silently failed to load looks identical to a quiet host.
+    - name: Read loaded audit rules
+      ansible.builtin.command: auditctl -l
+      register: dvp_loaded_rules
+      changed_when: false
+
+    - name: Fail if the execve watch is missing
+      ansible.builtin.assert:
+        that:
+          - "'execve-watch' in dvp_loaded_rules.stdout"
+          - "'sudoers-watch' in dvp_loaded_rules.stdout"
+          - "'cron-watch' in dvp_loaded_rules.stdout"
+        fail_msg: >-
+          Audit rules are not loaded. Every Linux detection will report BLIND
+          until this is fixed. Check `augenrules --load` output and whether the
+          rule set is already immutable.
+        success_msg: "audit watches loaded ({{ dvp_loaded_rules.stdout_lines | length }} rules)"
+
+    - name: Check for dropped audit records
+      ansible.builtin.command: auditctl -s
+      register: dvp_audit_status
+      changed_when: false
+
+    - name: Warn on dropped records
+      ansible.builtin.debug:
+        msg: >-
+          auditd is reporting lost records on this host. Validation results
+          will under-report detection. Raise the backlog limit above
+          {{ dvp_audit_backlog }} and investigate the load.
+      when: "'lost 0' not in dvp_audit_status.stdout"

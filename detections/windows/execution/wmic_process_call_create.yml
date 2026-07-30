@@ -1,0 +1,73 @@
+id: d41b7a35-0e62-49f8-9c34-8b5f1e07a2dd
+name: wmic_process_call_create
+title: Process created through WMI by wmic.exe
+status: production
+severity: medium
+description: >-
+  wmic.exe was used to spawn a process via `process call create`. WMI process
+  creation breaks the normal parent/child chain - the new process is parented to
+  wmiprvse.exe - which is exactly why intrusion tooling favours it. Check the
+  /node: argument: a remote target makes this lateral movement rather than
+  local execution.
+author: detection-engineering
+date: 2026-01-21
+references:
+  - https://attack.mitre.org/techniques/T1047/
+
+attack:
+  tactics: [execution]
+  techniques: [T1047]
+
+platforms: [windows]
+
+logsource:
+  product: windows
+  service: sysmon
+  category: process_creation
+
+telemetry:
+  - sysmon_process_creation
+
+detection:
+  selection:
+    EventID: 1
+    Image|endswith: '\wmic.exe'
+    CommandLine|contains|all:
+      - 'process'
+      - 'call'
+      - 'create'
+
+  filter_management_tooling:
+    ParentImage|endswith:
+      - '\ccmexec.exe'
+      - '\MonitoringHost.exe'
+
+  condition: selection and not filter_management_tooling
+
+fields:
+  - Computer
+  - User
+  - CommandLine
+  - ParentImage
+  - ParentCommandLine
+  - IntegrityLevel
+
+falsepositives:
+  - >-
+    Legacy deployment scripts still use wmic for remote execution. Identify them
+    by their parent process and their consistent /node: target list.
+
+validation:
+  emulation:
+    - T1047-wmic-process-call-create
+  expect: detected
+  max_latency: 3m
+  owner: detection-engineering
+
+tuning:
+  baseline_profile: windows-workstation
+  expected_daily_volume: 1
+
+tags:
+  - purple-team
+  - lolbin

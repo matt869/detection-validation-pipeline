@@ -1,0 +1,88 @@
+id: 2f8a4d17-63c9-4f0b-8ad2-71e5c9b30a66
+name: sam_hive_dump
+title: Registry hive containing local credentials saved to disk
+status: production
+severity: high
+description: >-
+  reg.exe was used to export the SAM, SECURITY, or SYSTEM hive, or a file with a
+  hive-dump name appeared on disk. Together these hives yield local account
+  hashes and the machine's DPAPI and LSA secrets. Legitimate administrative use
+  is rare and is nearly always paired with a documented change record.
+author: detection-engineering
+date: 2026-01-18
+references:
+  - https://attack.mitre.org/techniques/T1003/002/
+
+attack:
+  tactics: [credential-access]
+  techniques: [T1003.002]
+
+platforms: [windows]
+
+logsource:
+  product: windows
+  service: sysmon
+  category: process_creation
+
+telemetry:
+  - sysmon_process_creation
+  - sysmon_file_create
+
+detection:
+  selection_reg_save:
+    EventID: 1
+    Image|endswith: '\reg.exe'
+    CommandLine|contains|all:
+      - 'save'
+      - 'hklm\'
+    CommandLine|contains:
+      - '\sam'
+      - '\security'
+      - '\system'
+
+  # Catches tooling that copies the hives without invoking reg.exe.
+  selection_hive_written:
+    EventID: 11
+    TargetFilename|endswith:
+      - '\sam.hive'
+      - '\sam.save'
+      - '\sam.bak'
+      - '\security.hive'
+      - '\system.hive'
+
+  filter_backup_agents:
+    Image|endswith:
+      - '\wbengine.exe'
+      - '\vssadmin.exe'
+
+  condition: 1 of selection_* and not filter_backup_agents
+
+fields:
+  - Computer
+  - User
+  - Image
+  - CommandLine
+  - TargetFilename
+  - ParentImage
+
+falsepositives:
+  - >-
+    Backup and imaging software exporting hives during a scheduled job. Excluded
+    by filter_backup_agents; correlate with the backup window before adding more.
+  - >-
+    Support engineers collecting hives for a genuine troubleshooting case. Should
+    always have a change record - ask for it.
+
+validation:
+  emulation:
+    - T1003.002-reg-save-sam
+  expect: detected
+  max_latency: 5m
+  owner: detection-engineering
+
+tuning:
+  baseline_profile: windows-server
+  expected_daily_volume: 0
+
+tags:
+  - purple-team

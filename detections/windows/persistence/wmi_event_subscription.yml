@@ -1,0 +1,83 @@
+id: e91c3b76-0d28-4a51-9c83-7b4e260f5a19
+name: wmi_event_subscription
+title: WMI permanent event subscription registered
+status: production
+severity: high
+description: >-
+  A WMI event filter, consumer, or filter-to-consumer binding was registered.
+  Permanent subscriptions run as SYSTEM, survive reboot, and live in the WMI
+  repository rather than on disk, which is why they are a favourite of
+  long-dwell intrusions. Retrieve the filter query and the consumer command
+  together - either one alone is not enough to understand the trigger.
+author: detection-engineering
+date: 2026-03-01
+references:
+  - https://attack.mitre.org/techniques/T1546/003/
+
+attack:
+  tactics: [persistence, privilege-escalation]
+  techniques: [T1546.003]
+
+platforms: [windows]
+
+logsource:
+  product: windows
+  service: sysmon
+  category: wmi_event
+
+telemetry:
+  - sysmon_wmi_subscription
+
+detection:
+  selection:
+    EventID:
+      - 19
+      - 20
+      - 21
+
+  # Shipped by Windows and by SCCM; these are the only subscriptions that
+  # should exist on a standard build.
+  filter_builtin_consumers:
+    Name|contains:
+      - 'SCM Event Log'
+      - 'BVTFilter'
+      - 'TSLogonEvents'
+      - 'RAevent'
+      - 'SCM Event Log Consumer'
+
+  condition: selection and not filter_builtin_consumers
+
+fields:
+  - Computer
+  - User
+  - EventID
+  - Operation
+  - Name
+  - Query
+  - Consumer
+  - Destination
+
+falsepositives:
+  - >-
+    Monitoring agents (SCOM, Nagios plugins) register subscriptions at install
+    time. Enumerate the estate's legitimate subscriptions once and add them
+    here - the set should be small, stable, and reviewed on change.
+
+validation:
+  emulation:
+    - T1546.003-wmi-subscription
+  expect: detected
+  max_latency: 10m
+  owner: detection-engineering
+
+tuning:
+  baseline_profile: windows-server
+  expected_daily_volume: 0
+  notes:
+    - >-
+      Sysmon must have WmiEvent enabled; the default config from some vendors
+      comments it out entirely.
+
+tags:
+  - purple-team
+  - fileless

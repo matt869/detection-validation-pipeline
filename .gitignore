@@ -1,0 +1,59 @@
+# Local state: run database, caches, WAL sidecar files.
+.dvp/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+
+# Local configuration and credentials. Only settings.example.yml is committed;
+# config/settings.yml is yours and frequently contains an authorisation
+# reference and host allowlist specific to your estate.
+config/settings.yml
+config/settings.yaml
+config/settings.local.yml
+.env
+.env.*
+!.env.example
+
+# Generated reports. Runs are reproducible from the database, and committing
+# them makes every diff enormous. Publish them as CI artefacts instead.
+docs/results/*/
+docs/results/LATEST
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.eggs/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+junit.xml
+
+# Editors and OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Terraform state contains resource identifiers and sometimes secrets.
+infra/terraform/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.*
+infra/terraform/*.tfvars
+!infra/terraform/*.tfvars.example
+infra/terraform/.terraform.lock.hcl
+
+# Ansible inventories name real hosts.
+infra/ansible/inventory*.ini
+infra/ansible/*.retry

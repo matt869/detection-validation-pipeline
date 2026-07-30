@@ -1,0 +1,62 @@
+# Templated unit: one instance per profile.
+#
+#   systemctl start dvp-validation@quick-smoke.service
+#   systemctl enable --now dvp-validation@credential-theft.timer
+#
+# Install to /etc/systemd/system/ along with the matching timer.
+
+[Unit]
+Description=Detection validation run (profile %i)
+Documentation=file:/opt/dvp/docs/architecture.md
+# Validation queries a SIEM; starting before the network is up just produces a
+# run where everything looks blind.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=dvp
+Group=dvp
+WorkingDirectory=/opt/dvp
+
+# Credentials come from the environment, never from the repository. This file
+# is root-owned and mode 0600.
+EnvironmentFile=-/etc/dvp/environment
+Environment=DVP_ROOT=/opt/dvp
+Environment=PYTHONUNBUFFERED=1
+Environment=NO_COLOR=1
+
+ExecStart=/opt/dvp/.venv/bin/dvp --log-format json run --profile %i
+
+# A failing gate exits 1. That is a real result, not a crash: the report was
+# written and stored. Treat it as success at the unit level so the timer keeps
+# running and the alerting comes from the report, not from systemd.
+SuccessExitStatus=0 1
+
+TimeoutStartSec=45min
+
+# Hardening. The process needs to read the repo, write the database and
+# reports, and reach the SIEM over the network. Nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+ReadWritePaths=/opt/dvp/.dvp /opt/dvp/docs/results
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

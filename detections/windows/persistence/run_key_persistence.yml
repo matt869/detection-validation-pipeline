@@ -1,0 +1,85 @@
+id: 7a4c8e13-2b56-4d09-8f7a-c3e1902b6d45
+name: run_key_persistence
+title: Autostart Run key written with a suspicious payload path
+status: production
+severity: high
+description: >-
+  A value was written to a Run, RunOnce, or Explorer policy Run key pointing at
+  a user-writable directory or a script interpreter. Legitimate software
+  installs autostart entries from Program Files under an installer process;
+  payload paths under AppData, Temp, or Public almost never are. The Details
+  field holds the command that will run at next logon.
+author: detection-engineering
+date: 2026-01-27
+references:
+  - https://attack.mitre.org/techniques/T1547/001/
+
+attack:
+  tactics: [persistence, privilege-escalation]
+  techniques: [T1547.001]
+
+platforms: [windows]
+
+logsource:
+  product: windows
+  service: sysmon
+  category: registry_set
+
+telemetry:
+  - sysmon_registry_set
+
+detection:
+  selection_autostart_key:
+    EventID: 13
+    TargetObject|contains:
+      - '\CurrentVersion\Run\'
+      - '\CurrentVersion\RunOnce\'
+      - '\CurrentVersion\RunServices\'
+      - '\CurrentVersion\Policies\Explorer\Run\'
+
+  selection_suspicious_payload:
+    Details|contains:
+      - '\AppData\'
+      - '\Users\Public\'
+      - '\Windows\Temp\'
+      - '\ProgramData\'
+      - 'powershell'
+      - 'mshta'
+      - 'rundll32'
+      - 'wscript'
+      - 'cscript'
+
+  filter_installers:
+    Image|endswith:
+      - '\msiexec.exe'
+      - '\TrustedInstaller.exe'
+      - '\ccmexec.exe'
+
+  condition: selection_autostart_key and selection_suspicious_payload and not filter_installers
+
+fields:
+  - Computer
+  - User
+  - Image
+  - TargetObject
+  - Details
+
+falsepositives:
+  - >-
+    Per-user applications that legitimately install into AppData, notably some
+    chat and sync clients. Exclude by the specific value name, not by the
+    AppData prefix, or the rule loses most of its value.
+
+validation:
+  emulation:
+    - T1547.001-run-key-appdata
+  expect: detected
+  max_latency: 5m
+  owner: detection-engineering
+
+tuning:
+  baseline_profile: windows-workstation
+  expected_daily_volume: 3
+
+tags:
+  - purple-team

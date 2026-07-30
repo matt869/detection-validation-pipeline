@@ -1,0 +1,17 @@
+scenario: baseline
+description: >-
+  An hour of ordinary estate activity with no emulation running. Every event
+  here is tagged `__baseline__` and is anchored to the quiet window sampled
+  before a run, never to an emulation test.
+
+  Its purpose is adversarial: a rule that matches anything in this corpus is
+  producing noise, and the harness records that as a distinct finding from the
+  detection outcome. A rule can be DETECTED and noisy at the same time - and a
+  rule that is both is not a working control, it is an alert generator.
+
+  The Teams autostart entry is deliberately included. run_key_persistence
+  matches it, which is a true finding: that rule needs tuning before it can be
+  trusted at the volume its own metadata predicts.
+recorded_at: "2026-05-14T08:00:00Z"
+recorded_from: WKS-LAB-014, SRV-LAB-APP2, lab-lnx-02, aws 123456789012
+tests: []

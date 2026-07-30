@@ -1,0 +1,13 @@
+scenario: aws-control-plane
+description: >-
+  CloudTrail management events from the validation account. Offsets are large
+  compared with the endpoint scenarios because CloudTrail delivery is batched -
+  the recorded latencies are real, and they are why the cloud rules carry a
+  15 minute budget rather than the 3 minutes used on the endpoint.
+recorded_at: "2026-05-14T16:30:00Z"
+recorded_from: aws account 123456789012 (validation)
+sensor: Organisation trail, management events, all regions
+tests:
+  - T1562.008-cloudtrail-stop-logging
+  - T1098.001-iam-access-key-create
+  - T1078.004-root-console-login

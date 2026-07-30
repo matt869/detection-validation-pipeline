@@ -1,0 +1,75 @@
+# AWS emulation tests
+#
+# All manual. Cloud control-plane actions are account-wide and often
+# irreversible in effect even when reversible in form - stopping a trail
+# creates a permanent hole in the audit record for the period it was off. The
+# harness reserves the window, times the detection, and scores the result; a
+# named operator performs the action.
+
+tests:
+
+  - id: T1562.008-cloudtrail-stop-logging
+    name: Stop CloudTrail logging on a non-production trail
+    technique: T1562.008
+    platform: aws
+    privileges: iam-admin
+    executor: manual
+    safe_mode: false
+    destructive: true
+    duration: 30s
+    description: >-
+      `aws cloudtrail stop-logging --name <trail>` followed immediately by
+      `start-logging`. Marked destructive: the gap in the audit record is real
+      and cannot be backfilled. Use a dedicated validation trail, never the
+      organisation trail.
+    prerequisites:
+      - A dedicated non-production trail used only for validation
+      - Approval recorded in the authorisation reference
+    expected_telemetry:
+      - aws_cloudtrail_management
+    references:
+      - https://attack.mitre.org/techniques/T1562/008/
+    notes: >-
+      Confirm start-logging succeeded before closing the window. Leaving a
+      trail stopped is the failure mode that matters here.
+
+  - id: T1098.001-iam-access-key-create
+    name: Create an IAM access key outside the deployment role
+    technique: T1098.001
+    platform: aws
+    privileges: iam-admin
+    executor: manual
+    safe_mode: false
+    duration: 30s
+    description: >-
+      Create a second access key for a throwaway IAM user, then delete it.
+      Manual because a live access key is a credential; it must never be
+      written to a log the harness captures.
+    prerequisites:
+      - A throwaway IAM user with no attached policies
+    expected_telemetry:
+      - aws_cloudtrail_management
+    references:
+      - https://attack.mitre.org/techniques/T1098/001/
+    notes: >-
+      Delete the key within the same session. Do not paste it anywhere.
+
+  - id: T1078.004-root-console-login
+    name: Sign in to the console as the account root user
+    technique: T1078.004
+    platform: aws
+    privileges: root
+    executor: manual
+    safe_mode: false
+    duration: 60s
+    description: >-
+      Perform a break-glass root sign-in from outside the SOC egress range so
+      the detection has something to fire on. Requires the root credential and
+      its MFA device, so it is inherently a two-person operation.
+    prerequisites:
+      - Break-glass procedure invoked and recorded
+      - Second approver present
+    expected_telemetry:
+      - aws_cloudtrail_management
+    references:
+      - https://attack.mitre.org/techniques/T1078/004/

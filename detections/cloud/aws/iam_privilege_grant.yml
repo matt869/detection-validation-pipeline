@@ -1,0 +1,87 @@
+id: 6d47e0c3-b285-4f19-93a7-1e0b8ca5726f
+name: iam_privilege_grant
+title: IAM credential or privilege granted outside the deployment pipeline
+status: production
+severity: high
+description: >-
+  An access key, login profile, or policy attachment was created by a principal
+  other than the IAM deployment role. Persisting in an AWS account usually means
+  minting a second credential rather than keeping the first one, so this is the
+  step that converts a single stolen session into durable access. Identify the
+  principal that made the call and the identity that received the privilege -
+  they are rarely the same.
+author: cloud-security
+date: 2026-02-08
+references:
+  - https://attack.mitre.org/techniques/T1098/001/
+
+attack:
+  tactics: [persistence, privilege-escalation]
+  techniques: [T1098.001]
+
+platforms: [aws]
+
+logsource:
+  product: aws
+  service: cloudtrail
+
+telemetry:
+  - aws_cloudtrail_management
+
+detection:
+  selection:
+    eventSource: iam.amazonaws.com
+    eventName:
+      - CreateAccessKey
+      - CreateLoginProfile
+      - UpdateLoginProfile
+      - AttachUserPolicy
+      - AttachRolePolicy
+      - PutUserPolicy
+      - CreateUser
+
+  filter_denied:
+    errorCode|exists: true
+
+  filter_deployment_pipeline:
+    userIdentity.arn|contains:
+      - ':assumed-role/terraform-iam-deploy/'
+      - ':assumed-role/AWSControlTowerExecution/'
+      - ':assumed-role/AWSAFTExecution/'
+
+  condition: selection and not 1 of filter_*
+
+fields:
+  - eventTime
+  - eventName
+  - awsRegion
+  - userIdentity.arn
+  - userIdentity.type
+  - userIdentity.userName
+  - sourceIPAddress
+  - userAgent
+  - requestParameters
+  - responseElements
+
+falsepositives:
+  - >-
+    Break-glass account provisioning during an incident. Legitimate, but should
+    still be reviewed - the alert is the review.
+  - >-
+    Onboarding automation that has not yet been migrated to the deployment
+    role. Migrate it rather than excluding it; a second excluded role is a
+    second blind spot.
+
+validation:
+  emulation:
+    - T1098.001-iam-access-key-create
+  expect: detected
+  max_latency: 15m
+  owner: cloud-security
+
+tuning:
+  baseline_profile: aws-production
+  expected_daily_volume: 2
+
+tags:
+  - purple-team

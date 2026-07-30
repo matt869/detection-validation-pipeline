@@ -1,0 +1,12 @@
+scenario: persistence
+description: >-
+  Autostart, scheduled task, and WMI subscription persistence on a lab
+  workstation and a lab server. All three tests are safe-mode: real persistence
+  mechanisms with inert payloads, cleaned up immediately after recording.
+recorded_at: "2026-05-14T11:20:00Z"
+recorded_from: WKS-LAB-014, SRV-LAB-APP2
+sensor: Sysmon 15.15 with RegistryEvent and WmiEvent enabled
+tests:
+  - T1547.001-run-key-appdata
+  - T1053.005-schtasks-powershell
+  - T1546.003-wmi-subscription

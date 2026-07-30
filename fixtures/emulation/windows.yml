@@ -1,0 +1,302 @@
+# Windows emulation tests
+#
+# `executor: manual` means the harness plans, times and scores the test but
+# never runs it - an operator performs the behaviour under their own authority.
+# That is the right setting for anything that touches credentials or defences.
+#
+# `safe_mode: true` with a real command means the command is a benign stand-in
+# that produces telemetry of the same shape without the harmful effect. Those
+# are the tests CI can execute in a lab.
+
+tests:
+
+  - id: T1003.001-lsass-handle-open
+    name: Open a read handle to LSASS
+    technique: T1003.001
+    platform: windows
+    privileges: administrator
+    executor: manual
+    safe_mode: false
+    destructive: false
+    duration: 10s
+    description: >-
+      Open a handle to lsass.exe with PROCESS_VM_READ and dump its memory.
+      Deliberately not automated: the harness will not run credential access
+      against a live host on anyone's behalf. Run your own tooling inside the
+      window the harness reserves, or replay the recorded corpus offline.
+    expected_telemetry:
+      - sysmon_process_access
+    prerequisites:
+      - Sysmon with ProcessAccess enabled for lsass.exe targets
+      - Local administrator rights on the lab host
+    atomic_ref: atomic-red-team T1003.001 (Windows Credential Editor / ProcDump variants)
+    references:
+      - https://attack.mitre.org/techniques/T1003/001/
+    notes: >-
+      If you script this, delete the resulting dump file before leaving the
+      host. A forgotten LSASS dump on disk is a real incident.
+
+  - id: T1003.001-comsvcs-minidump
+    name: Dump LSASS via the comsvcs.dll MiniDump export
+    technique: T1003.001
+    platform: windows
+    privileges: administrator
+    executor: manual
+    safe_mode: false
+    duration: 10s
+    description: >-
+      Invoke rundll32 against comsvcs.dll MiniDump to write LSASS memory to
+      disk using only signed Microsoft binaries. Manual for the same reason as
+      the handle-open test.
+    expected_telemetry:
+      - sysmon_process_creation
+    atomic_ref: atomic-red-team T1003.001 comsvcs.dll
+    references:
+      - https://lolbas-project.github.io/lolbas/Libraries/Comsvcs/
+
+  - id: T1003.002-reg-save-sam
+    name: Export the SAM hive with reg.exe
+    technique: T1003.002
+    platform: windows
+    privileges: administrator
+    executor: manual
+    safe_mode: false
+    duration: 8s
+    description: >-
+      `reg save HKLM\SAM` writes local account hashes to a file. Manual: the
+      output is real credential material.
+    expected_telemetry:
+      - sysmon_process_creation
+      - sysmon_file_create
+    references:
+      - https://attack.mitre.org/techniques/T1003/002/
+
+  - id: T1059.001-powershell-encoded
+    name: Run a base64-encoded PowerShell command
+    technique: T1059.001
+    platform: windows
+    executor: powershell
+    safe_mode: true
+    duration: 6s
+    description: >-
+      Executes an encoded command that writes a marker string. The encoding is
+      the behaviour under test; the payload is deliberately inert.
+    command: |
+      $marker = 'Write-Output "dvp-validation-marker"'
+      $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($marker))
+      powershell.exe -NoProfile -EncodedCommand $encoded
+    cleanup: |
+      Write-Output "no cleanup required: the test writes nothing to disk"
+    expected_telemetry:
+      - sysmon_process_creation
+      - windows_powershell_scriptblock
+    references:
+      - https://attack.mitre.org/techniques/T1059/001/
+
+  - id: T1047-wmic-process-call-create
+    name: Spawn a process through WMI
+    technique: T1047
+    platform: windows
+    executor: cmd
+    safe_mode: true
+    duration: 6s
+    description: >-
+      Uses `wmic process call create` to start a benign process. The parent of
+      the new process is wmiprvse.exe, which is the detection-relevant part.
+    command: wmic process call create "cmd.exe /c echo dvp-validation-marker > %TEMP%\dvp-wmic.txt"
+    cleanup: cmd /c del /q "%TEMP%\dvp-wmic.txt" 2>nul & exit /b 0
+    expected_telemetry:
+      - sysmon_process_creation
+    references:
+      - https://attack.mitre.org/techniques/T1047/
+
+  - id: T1218.005-mshta-remote-hta
+    name: Launch mshta.exe against a remote URL
+    technique: T1218.005
+    platform: windows
+    executor: manual
+    safe_mode: false
+    duration: 8s
+    description: >-
+      mshta.exe fetching an .hta over HTTP. Manual because a safe version would
+      need a controlled web server; point it at your own lab host.
+    expected_telemetry:
+      - sysmon_process_creation
+      - sysmon_network_connection
+    references:
+      - https://attack.mitre.org/techniques/T1218/005/
+
+  - id: T1218.011-rundll32-javascript
+    name: Execute script through rundll32 and mshtml
+    technique: T1218.011
+    platform: windows
+    executor: cmd
+    safe_mode: true
+    duration: 6s
+    description: >-
+      The classic rundll32 javascript: proxy execution, with an inert payload
+      that only opens and closes a window handle.
+    command: rundll32.exe javascript:"\..\mshtml,RunHTMLApplication ";document.write();close();
+    cleanup: cmd /c exit /b 0
+    expected_telemetry:
+      - sysmon_process_creation
+    references:
+      - https://lolbas-project.github.io/lolbas/Binaries/Rundll32/
+
+  - id: T1070.001-wevtutil-clear-log
+    name: Clear a Windows event log
+    technique: T1070.001
+    platform: windows
+    privileges: administrator
+    executor: manual
+    safe_mode: false
+    destructive: true
+    duration: 6s
+    description: >-
+      Clears an event log with wevtutil. Marked destructive: clearing a log
+      destroys evidence, and doing it accidentally on a shared lab host wastes
+      everyone's afternoon. Requires safety.allow_destructive plus authorisation.
+    expected_telemetry:
+      - windows_security_log_cleared
+      - sysmon_process_creation
+    references:
+      - https://attack.mitre.org/techniques/T1070/001/
+    notes: >-
+      If you must run this, target a throwaway custom log created for the
+      purpose, not Security.
+
+  - id: T1562.001-defender-path-exclusion
+    name: Add a Microsoft Defender path exclusion
+    technique: T1562.001
+    platform: windows
+    privileges: administrator
+    executor: manual
+    safe_mode: false
+    duration: 8s
+    description: >-
+      Adds and then removes a Defender path exclusion. Manual because an
+      exclusion left behind is a genuine weakening of the host's defences.
+    expected_telemetry:
+      - windows_defender_operational
+    references:
+      - https://attack.mitre.org/techniques/T1562/001/
+
+  - id: T1547.001-run-key-appdata
+    name: Write an autostart Run key pointing at AppData
+    technique: T1547.001
+    platform: windows
+    executor: powershell
+    safe_mode: true
+    duration: 6s
+    description: >-
+      Creates a HKCU Run value referencing a PowerShell command under AppData,
+      then removes it. Real persistence mechanism, inert payload.
+    command: |
+      New-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' `
+        -Name 'DvpValidationMarker' `
+        -Value 'powershell.exe -NoProfile -Command "exit 0"  # C:\Users\Public\marker' `
+        -PropertyType String -Force | Out-Null
+    cleanup: |
+      Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' `
+        -Name 'DvpValidationMarker' -ErrorAction SilentlyContinue
+    expected_telemetry:
+      - sysmon_registry_set
+    references:
+      - https://attack.mitre.org/techniques/T1547/001/
+
+  - id: T1053.005-schtasks-powershell
+    name: Create a scheduled task that runs PowerShell
+    technique: T1053.005
+    platform: windows
+    executor: cmd
+    safe_mode: true
+    duration: 8s
+    description: >-
+      Registers a scheduled task whose action is a PowerShell no-op, then
+      deletes it. Exercises the real persistence path with no payload.
+    command: schtasks /create /tn "DvpValidationMarker" /tr "powershell.exe -NoProfile -Command exit 0" /sc once /st 23:59 /f
+    cleanup: schtasks /delete /tn "DvpValidationMarker" /f
+    expected_telemetry:
+      - sysmon_process_creation
+    references:
+      - https://attack.mitre.org/techniques/T1053/005/
+
+  - id: T1546.003-wmi-subscription
+    name: Register a WMI permanent event subscription
+    technique: T1546.003
+    platform: windows
+    privileges: administrator
+    executor: powershell
+    safe_mode: true
+    duration: 12s
+    description: >-
+      Creates a filter, a log-only consumer, and the binding between them, then
+      removes all three. The consumer writes to the application log rather than
+      executing anything.
+    command: |
+      $filter = Set-WmiInstance -Namespace root\subscription -Class __EventFilter -Arguments @{
+        Name = 'DvpValidationFilter'
+        EventNamespace = 'root\cimv2'
+        QueryLanguage = 'WQL'
+        Query = "SELECT * FROM __InstanceModificationEvent WITHIN 60 WHERE TargetInstance ISA 'Win32_PerfFormattedData_PerfOS_System'"
+      }
+      $consumer = Set-WmiInstance -Namespace root\subscription -Class NTEventLogEventConsumer -Arguments @{
+        Name = 'DvpValidationConsumer'
+        SourceName = 'DvpValidation'
+        EventID = 8
+        EventType = 4
+        NumberOfInsertionStrings = 1
+        InsertionStringTemplates = @('dvp-validation-marker')
+      }
+      Set-WmiInstance -Namespace root\subscription -Class __FilterToConsumerBinding -Arguments @{
+        Filter = $filter
+        Consumer = $consumer
+      } | Out-Null
+    cleanup: |
+      Get-WmiObject -Namespace root\subscription -Class __FilterToConsumerBinding |
+        Where-Object { $_.Filter -match 'DvpValidationFilter' } | Remove-WmiObject -ErrorAction SilentlyContinue
+      Get-WmiObject -Namespace root\subscription -Class __EventFilter -Filter "Name='DvpValidationFilter'" |
+        Remove-WmiObject -ErrorAction SilentlyContinue
+      Get-WmiObject -Namespace root\subscription -Class NTEventLogEventConsumer -Filter "Name='DvpValidationConsumer'" |
+        Remove-WmiObject -ErrorAction SilentlyContinue
+    expected_telemetry:
+      - sysmon_wmi_subscription
+    references:
+      - https://attack.mitre.org/techniques/T1546/003/
+    notes: >-
+      Verify cleanup succeeded. A leftover subscription is indistinguishable
+      from real persistence to the next person who looks.
+
+  - id: T1021.002-service-remote-exec
+    name: Install a remote-execution style service
+    technique: T1021.002
+    platform: windows
+    privileges: administrator
+    executor: cmd
+    safe_mode: true
+    duration: 8s
+    description: >-
+      Creates a service whose image path is a command interpreter, matching the
+      shape of PsExec-style lateral movement, then deletes it. The service is
+      never started.
+    command: sc.exe create DvpValidationSvc binPath= "%COMSPEC% /c exit 0" start= demand DisplayName= "DVP Validation Marker"
+    cleanup: sc.exe delete DvpValidationSvc
+    expected_telemetry:
+      - windows_system_service_install
+    references:
+      - https://attack.mitre.org/techniques/T1021/002/
+
+  - id: T1021.001-rdp-interactive-logon
+    name: Establish an interactive RDP session
+    technique: T1021.001
+    platform: windows
+    executor: manual
+    safe_mode: false
+    duration: 20s
+    description: >-
+      Connect to the lab host over RDP from a workstation-range address and log
+      off. Manual because it needs a second machine and an interactive session.
+    expected_telemetry:
+      - windows_security_logon
+    references:
+      - https://attack.mitre.org/techniques/T1021/001/

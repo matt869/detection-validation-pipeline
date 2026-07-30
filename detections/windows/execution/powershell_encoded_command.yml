@@ -1,0 +1,95 @@
+id: 8c3d5e91-4b27-4c58-b1a9-6d0f27e4c153
+name: powershell_encoded_command
+title: PowerShell executed a base64-encoded command
+status: production
+severity: high
+description: >-
+  PowerShell was invoked with -EncodedCommand, or a script block decoded base64
+  at runtime. Encoding is used legitimately by a handful of management tools to
+  pass quoted arguments, but it is also the default delivery mechanism for
+  nearly every commodity loader. Decode the command line before triaging - the
+  script block source gives the plaintext directly.
+author: detection-engineering
+date: 2026-01-09
+modified: 2026-04-22
+references:
+  - https://attack.mitre.org/techniques/T1059/001/
+
+attack:
+  tactics: [execution]
+  techniques: [T1059.001]
+
+platforms: [windows]
+
+logsource:
+  product: windows
+  service: sysmon
+  category: process_creation
+
+telemetry:
+  - sysmon_process_creation
+  - windows_powershell_scriptblock
+
+detection:
+  # windash covers `/enc`, en-dash and em-dash spellings, which Windows accepts
+  # and which defeat rules that only match the ASCII hyphen.
+  selection_command_line:
+    EventID: 1
+    Image|endswith:
+      - '\powershell.exe'
+      - '\pwsh.exe'
+    CommandLine|contains|windash:
+      - '-encodedcommand'
+      - '-enc '
+
+  # Script block logging de-obfuscates, so it catches encodings the command
+  # line never shows - at the cost of firing after execution has begun.
+  selection_script_block:
+    EventID: 4104
+    ScriptBlockText|contains:
+      - 'FromBase64String'
+      - 'System.IO.Compression.GzipStream'
+      - 'IEX(New-Object'
+
+  filter_management_tooling:
+    ParentImage|endswith:
+      - '\ccmexec.exe'
+      - '\SCNotification.exe'
+      - '\MonitoringHost.exe'
+
+  condition: 1 of selection_* and not filter_management_tooling
+
+fields:
+  - Computer
+  - User
+  - CommandLine
+  - ScriptBlockText
+  - ParentImage
+  - ParentCommandLine
+
+falsepositives:
+  - >-
+    Configuration management (SCCM, Intune, Ansible WinRM) routinely encodes
+    commands. The common parents are excluded; add others only after confirming
+    the parent process cannot itself be spawned by an attacker.
+  - >-
+    Some vendor installers wrap PowerShell in -EncodedCommand. Verify the
+    signature on the parent binary before excluding it.
+
+validation:
+  emulation:
+    - T1059.001-powershell-encoded
+  expect: detected
+  max_latency: 2m
+  owner: detection-engineering
+
+tuning:
+  baseline_profile: windows-workstation
+  expected_daily_volume: 4
+  notes:
+    - >-
+      Script block logging must be enabled by GPO or selection_script_block is
+      dead weight; `dvp run` reports it as a visibility gap when it is missing.
+
+tags:
+  - purple-team

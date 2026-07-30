@@ -1,0 +1,85 @@
+# Scheduled validation jobs.
+#
+# This file is a manifest, not a scheduler. The pipeline deliberately does not
+# ship a daemon: systemd timers (scheduler/systemd/) and CI cron already solve
+# this, they survive reboots, they log where operators already look, and they
+# do not need a long-running process holding SIEM credentials.
+#
+# `dvp` reads nothing from this file at runtime. It exists so the schedule is
+# reviewable in the same repository as the content it runs, and so the systemd
+# units can be generated from one source of truth:
+#
+#   python scripts/render_systemd.py > /dev/null   # see the script for usage
+
+version: 1
+timezone: UTC
+
+defaults:
+  # Runs that execute emulation must name the authorisation they run under.
+  # A job with execute: true and no authorization_reference is refused by the
+  # safety policy at run time, not here - this is documentation, the policy is
+  # the control.
+  execute: false
+  backend: fixture
+  formats: [json, markdown]
+  # Where a failure goes. The pipeline writes reports; delivery is the job of
+  # whatever runs it.
+  notify: detection-engineering
+
+jobs:
+
+  - name: pr-smoke
+    description: >-
+      Offline regression check on every pull request. Fast enough to block a
+      merge on, and cannot be flaky because nothing leaves the runner.
+    profile: quick-smoke
+    trigger: ci
+    on: [pull_request, push]
+    backend: fixture
+    execute: false
+    fail_build_on: [regression, error]
+
+  - name: nightly-offline
+    description: >-
+      Full offline pass across every rule with recorded telemetry. Catches
+      content drift - a rule edited yesterday that no longer matches its own
+      fixture.
+    profile: quick-smoke
+    trigger: timer
+    schedule: "02:15"
+    backend: fixture
+    execute: false
+    formats: [json, markdown, html, navigator]
+
+  - name: weekly-credential-theft
+    description: >-
+      Live validation of the credential access chain against the lab. Executes
+      emulation, so it runs only where an authorisation reference is configured.
+    profile: credential-theft
+    trigger: timer
+    schedule: "Sun 03:00"
+    backend: splunk
+    execute: true
+    # Referenced in config/settings.yml as safety.authorization_reference.
+    authorization: "CHG-2026-0417 (standing purple-team authorisation, lab only)"
+    formats: [json, markdown, html, navigator]
+    notify: detection-engineering, soc-leads
+
+  - name: monthly-ransomware-precursor
+    description: >-
+      The full precursor chain, reported to leadership. Encryption is never
+      emulated; see the profile.
+    profile: ransomware-precursor
+    trigger: timer
+    schedule: "Mon *-*-01..07 04:00"
+    backend: splunk
+    execute: true
+    authorization: "CHG-2026-0417"
+    formats: [json, markdown, html, navigator]
+    notify: detection-engineering, soc-leads, ciso
+
+maintenance:
+  - name: prune-old-runs
+    description: Drop run records past the retention window.
+    command: dvp db prune
+    schedule: "Sun 05:00"

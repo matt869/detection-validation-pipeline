@@ -1,0 +1,21 @@
+name: linux-server
+description: >-
+  Ubuntu LTS servers under Ansible configuration management. Unattended
+  upgrades and the nightly Ansible run are the only routine writes to watched
+  paths.
+owner: linux-platform
+hosts:
+  - "lab-lnx-*"
+  - "app-*"
+  - "web-*"
+window_seconds: 3600
+
+accepted_noise:
+  - rule: cron_persistence
+    max_hits: 2
+    reason: >-
+      Package installation drops files into /etc/cron.d during unattended
+      upgrades. The rule already excludes the configuration-management agents;
+      these are dpkg's own writes during the maintenance window.
+    owner: linux-platform
+    review_by: "2026-11-01"

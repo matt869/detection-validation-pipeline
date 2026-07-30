@@ -1,0 +1,82 @@
+id: 4f27a9d5-6c81-4e30-b2f9-08d3175ce6a2
+name: psexec_service_install
+title: Remote-execution service installed over the admin share
+status: production
+severity: high
+description: >-
+  A service was installed whose name or image path matches remote-execution
+  tooling, or which runs an interpreter directly from a UNC path. This is the
+  service-creation half of a PsExec-style lateral movement; the matching 4624
+  network logon on the same host, seconds earlier, identifies the source.
+  Confirm the account used and assume it is compromised.
+author: detection-engineering
+date: 2026-02-24
+references:
+  - https://attack.mitre.org/techniques/T1021/002/
+
+attack:
+  tactics: [lateral-movement]
+  techniques: [T1021.002]
+
+platforms: [windows]
+
+logsource:
+  product: windows
+  service: system
+
+telemetry:
+  - windows_system_service_install
+
+detection:
+  selection_service_installed:
+    EventID: 7045
+
+  selection_remote_exec_tooling:
+    - ServiceName|contains:
+        - 'PSEXESVC'
+        - 'PAExec'
+        - 'RemCom'
+        - 'CSExec'
+    - ImagePath|contains:
+        - '\\\\'
+        - '%COMSPEC%'
+        - 'powershell -'
+        - 'cmd.exe /c'
+        - '-encodedcommand'
+
+  filter_managed_services:
+    ServiceName|startswith:
+      - 'MSIServer'
+      - 'gupdate'
+      - 'ccmsetup'
+      - 'SenseCM'
+
+  condition: selection_service_installed and selection_remote_exec_tooling and not filter_managed_services
+
+fields:
+  - Computer
+  - ServiceName
+  - ImagePath
+  - ServiceType
+  - StartType
+  - AccountName
+
+falsepositives:
+  - >-
+    Vulnerability scanners and inventory tools install transient services to
+    run remote checks. They are predictable in name and origin IP; exclude the
+    scanner's service name, and alert if that name appears from any other host.
+
+validation:
+  emulation:
+    - T1021.002-service-remote-exec
+  expect: detected
+  max_latency: 5m
+  owner: detection-engineering
+
+tuning:
+  baseline_profile: windows-server
+  expected_daily_volume: 1
+
+tags:
+  - purple-team

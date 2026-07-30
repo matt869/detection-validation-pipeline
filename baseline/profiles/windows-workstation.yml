@@ -1,0 +1,33 @@
+name: windows-workstation
+description: >-
+  Standard managed Windows 11 workstation: SCCM-managed software, Chrome,
+  Teams, and an inventory agent. Anything a rule matches here it will also match
+  a few thousand times a day in production.
+owner: endpoint-engineering
+hosts:
+  - "wks-*"
+  - "lt-*"
+window_seconds: 3600
+
+# Noise we have looked at and decided to live with. Each entry is a decision
+# with an owner and a date, not a permanent exemption - the review date is the
+# point of the format.
+accepted_noise:
+  - rule: run_key_persistence
+    max_hits: 2
+    reason: >-
+      Teams and OneDrive rewrite their per-user Run entries on update, and both
+      live under AppData by design. Narrowing the rule to exclude those two
+      specific value names would also exclude an attacker who copies the name,
+      so we accept the volume and triage on the Details field instead.
+    owner: detection-engineering
+    review_by: "2026-10-01"
+
+  - rule: powershell_encoded_command
+    max_hits: 3
+    reason: >-
+      The SCCM inventory task encodes its arguments. Parented to CcmExec, which
+      the rule already excludes; the residual hits are the task's child
+      processes.
+    owner: endpoint-engineering
+    review_by: "2026-10-01"

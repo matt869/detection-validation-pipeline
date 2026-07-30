@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<style>{{& style }}</style>
+</head>
+<body>
+<main>
+  <h1>{{ heading }} <span class="verdict {{ verdict_class }}">{{ verdict }}</span></h1>
+  <p class="lede">{{ subtitle }}</p>
+
+  {{& tiles }}
+  {{& outcome_bar }}
+  {{& gates }}
+  {{& changes }}
+  {{& detection_gaps }}
+  {{& visibility_gaps }}
+  {{& noise }}
+  {{& coverage }}
+  {{& cases }}
+
+  <footer>{{ footer }}</footer>
+</main>
+</body>
+</html>

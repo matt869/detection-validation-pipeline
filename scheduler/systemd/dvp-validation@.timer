@@ -1,0 +1,28 @@
+# Templated timer. Schedules come from scheduler/jobs.yml; override per
+# instance with a drop-in rather than editing this file:
+#
+#   /etc/systemd/system/dvp-validation@credential-theft.timer.d/schedule.conf
+#     [Timer]
+#     OnCalendar=
+#     OnCalendar=Sun 03:00
+
+[Unit]
+Description=Schedule detection validation (profile %i)
+Documentation=file:/opt/dvp/scheduler/jobs.yml
+
+[Timer]
+# Default: nightly. Instances override this.
+OnCalendar=*-*-* 02:15:00
+
+# Spread runs so several profiles do not hit the SIEM at the same minute and
+# distort each other's measured detection latency.
+RandomizedDelaySec=15min
+
+# If the host was down at the scheduled time, run once on boot rather than
+# skipping the window entirely - a missed run is a gap in the trend line.
+Persistent=true
+
+Unit=dvp-validation@%i.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,72 @@
+id: 27b91f4e-8a03-4c56-9d18-e5f7402ba63c
+name: root_console_login
+title: AWS account root user signed in to the console
+status: production
+severity: critical
+description: >-
+  The root user of an AWS account authenticated to the console from an address
+  outside the break-glass range. Root is meant to be sealed after account
+  creation, so any use is either an emergency procedure that should have been
+  announced, or someone in possession of credentials that should not exist in
+  usable form. Both failed and successful sign-ins are in scope - a failed root
+  login is evidence the credential is being tried.
+author: cloud-security
+date: 2026-01-26
+references:
+  - https://attack.mitre.org/techniques/T1078/004/
+
+attack:
+  tactics: [initial-access, persistence, privilege-escalation, defense-evasion]
+  techniques: [T1078.004]
+
+platforms: [aws]
+
+logsource:
+  product: aws
+  service: cloudtrail
+
+telemetry:
+  - aws_cloudtrail_management
+
+detection:
+  selection:
+    eventName: ConsoleLogin
+    userIdentity.type: Root
+
+  # The documented break-glass procedure is performed from the SOC's fixed
+  # egress range and is announced in advance.
+  filter_break_glass_range:
+    sourceIPAddress|cidr: '203.0.113.0/24'
+
+  condition: selection and not filter_break_glass_range
+
+fields:
+  - eventTime
+  - awsRegion
+  - sourceIPAddress
+  - userAgent
+  - userIdentity.arn
+  - responseElements
+  - recipientAccountId
+  - errorCode
+
+falsepositives:
+  - >-
+    Announced break-glass exercises from outside the SOC range, for example
+    during a DR test. These should be pre-notified; if one was not, treat it as
+    a real alert until the operator is identified.
+
+validation:
+  emulation:
+    - T1078.004-root-console-login
+  expect: detected
+  max_latency: 15m
+  owner: cloud-security
+
+tuning:
+  baseline_profile: aws-production
+  expected_daily_volume: 0
+
+tags:
+  - purple-team
+  - crown-jewel
