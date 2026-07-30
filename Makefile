@@ -7,8 +7,9 @@
 # recipe bodies, or use `python -m harness <command>` directly.
 
 .DEFAULT_GOAL := help
-.PHONY: help install dev lint typecheck test test-cov rules score smoke run \
-        coverage report dashboard doctor db-migrate db-status clean ci
+.PHONY: help install dev lint typecheck test test-cov rules score schedule \
+        schedule-check smoke run coverage report dashboard doctor db-migrate \
+        db-status clean ci
 
 PY      ?= python
 PIP     ?= $(PY) -m pip
@@ -47,6 +48,12 @@ rules: ## Lint detection content against every shipped dialect
 
 score: ## Score detection content quality
 	$(DVP) rules score --explain
+
+schedule: ## Re-render the systemd drop-ins from scheduler/jobs.yml
+	$(PY) scripts/render_systemd.py
+
+schedule-check: ## Fail if the committed drop-ins no longer match the manifest
+	$(PY) scripts/render_systemd.py --check
 
 # -- running -----------------------------------------------------------------
 

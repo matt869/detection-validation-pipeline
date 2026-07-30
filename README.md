@@ -1,5 +1,7 @@
 # Detection Validation Pipeline
 
+[![ci](https://github.com/matt869/detection-validation-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/matt869/detection-validation-pipeline/actions/workflows/ci.yml)
+
 Prove your detections actually fire — and when they do not, say *why*.
 
 Most detection testing reports pass or fail. That hides the distinction that
@@ -187,10 +189,13 @@ $ pip install -e '.[dev]'
 $ pytest
 $ ruff check .
 $ dvp rules lint --dialect splunk --dialect elastic
+$ pre-commit install             # rule linting on every commit
 ```
 
 The offline test suite needs no infrastructure. `make ci` runs the same checks
-as the pipeline in `scheduler/jobs.yml`.
+as [`.github/workflows/ci.yml`](.github/workflows/ci.yml), which is the
+`pr-smoke` job from `scheduler/jobs.yml` — one manifest, three places that
+execute it, and a test that fails if they drift apart.
 
 ## License
 

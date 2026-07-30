@@ -41,8 +41,8 @@ dev = [
 dvp = "harness.cli:main"
 
 [project.urls]
-Documentation = "https://github.com/example/detection-validation-pipeline/tree/main/docs"
-Source = "https://github.com/example/detection-validation-pipeline"
+Documentation = "https://github.com/matt869/detection-validation-pipeline/tree/main/docs"
+Source = "https://github.com/matt869/detection-validation-pipeline"
 
 [tool.setuptools]
 packages = [

@@ -1,0 +1,76 @@
+# The `nightly-offline` job from scheduler/jobs.yml.
+#
+# The pull-request gate runs one profile because it has to be fast. This runs
+# every profile that can run offline, which is what catches content drift: a
+# rule edited last week that no longer matches its own recorded corpus, or a
+# coverage target that quietly stopped being met.
+#
+# Live profiles (`execute: true`, a real SIEM backend) are deliberately not
+# here. They need an authorisation reference and a lab, so they run from the
+# systemd timers in scheduler/systemd/ on a host inside that lab - not from a
+# runner holding SIEM credentials in a secret.
+
+name: nightly
+
+on:
+  schedule:
+    # 02:15 UTC, matching the nightly-offline job in scheduler/jobs.yml.
+    - cron: "15 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NO_COLOR: "1"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  offline:
+    name: ${{ matrix.profile }}
+    runs-on: ubuntu-latest
+    strategy:
+      # Every profile reports, even if an earlier one fails. A nightly that
+      # stops at the first failure hides the other three results.
+      fail-fast: false
+      matrix:
+        profile: [quick-smoke, credential-theft, ransomware-precursor]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install -e .
+
+      - name: Validate
+        run: |
+          set +e
+          dvp --log-format json run \
+            --profile ${{ matrix.profile }} \
+            --format json --format markdown --format html --format navigator \
+            --output artifacts
+          code=$?
+          set -e
+          case "$code" in
+            0) echo "all gates satisfied" ;;
+            1) echo "::warning title=Gate failed (${{ matrix.profile }})::A gate failed. This is a result, not a crash - the report was written." ;;
+            *) echo "::error title=Pipeline error (${{ matrix.profile }})::dvp exited $code before producing a verdict." ;;
+          esac
+          exit "$code"
+
+      - name: Publish the report to the job summary
+        if: always()
+        run: |
+          report=$(find artifacts -name report.md -print -quit 2>/dev/null || true)
+          [ -n "$report" ] && cat "$report" >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload the run
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-${{ matrix.profile }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 30

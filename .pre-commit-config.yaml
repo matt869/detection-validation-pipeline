@@ -1,0 +1,52 @@
+# Pre-commit hooks.
+#
+#   pip install pre-commit && pre-commit install
+#
+# The rule linter is the reason this file exists. A malformed detection is the
+# failure this repository is most likely to produce, it takes under a second to
+# catch, and catching it locally is the difference between a fixup commit and a
+# red pull request. Everything slower than that - the test suite, the offline
+# validation run - belongs in CI, not in a hook that runs on every commit.
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        # Recorded corpora are evidence. Reformatting them, even to strip a
+        # trailing space, changes the bytes a validation run is scored against.
+        exclude: ^fixtures/runs/
+      - id: check-yaml
+        exclude: ^fixtures/runs/
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=512]
+
+  - repo: local
+    hooks:
+      - id: dvp-rules-lint
+        name: lint detection rules
+        # Every dialect the repository ships: a rule that compiles for the
+        # fixture backend but not for Splunk is broken where it matters.
+        entry: dvp rules lint --dialect fixture --dialect splunk --dialect elastic
+        language: system
+        # The linter loads the whole rule library and cross-references it
+        # against the telemetry catalogue and the emulation tests, so it has to
+        # see all of it, not just the files in the commit.
+        pass_filenames: false
+        files: ^(detections/|mapping/|fixtures/emulation/)
+
+      - id: dvp-systemd-drift
+        name: systemd drop-ins match scheduler/jobs.yml
+        entry: python scripts/render_systemd.py --check
+        language: system
+        pass_filenames: false
+        files: ^(scheduler/|scripts/render_systemd\.py)

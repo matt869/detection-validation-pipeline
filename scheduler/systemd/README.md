@@ -2,12 +2,26 @@
 
 Templated units, one instance per validation profile.
 
+`generated/` holds the per-profile drop-ins, rendered from `scheduler/jobs.yml`
+by `scripts/render_systemd.py` and committed so that installing them needs
+nothing but `install(1)`. Do not edit them: change the schedule in the manifest
+and re-render, or the two disagree and the host wins.
+
+```sh
+python scripts/render_systemd.py          # after editing scheduler/jobs.yml
+python scripts/render_systemd.py --check  # what CI runs
+```
+
 ## Install
 
 ```sh
 sudo useradd --system --home-dir /opt/dvp --shell /usr/sbin/nologin dvp
 sudo install -o root -g root -m 0644 dvp-validation@.service /etc/systemd/system/
 sudo install -o root -g root -m 0644 dvp-validation@.timer   /etc/systemd/system/
+
+# Per-profile schedules and, where a job is authorised to emulate, its command
+# line. Copying the tree preserves the `<unit>.d/` layout systemd expects.
+sudo cp -r generated/. /etc/systemd/system/
 
 # Credentials. Root-owned, not world-readable, never in the repository.
 sudo install -d -m 0750 -o root -g dvp /etc/dvp

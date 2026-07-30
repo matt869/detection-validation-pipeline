@@ -177,11 +177,10 @@ def classify(
             notes.append(f"baseline query failed: {observation.baseline.error}")
 
     status = _status(outcome, case.expected)
-    evidence = (
-        redact(detection.sample(evidence_limit, case_fields(case)), redact_fields)
-        if store_evidence
-        else []
-    )
+    # No field projection: which fields explain a match differs per rule, and
+    # guessing wrong strips the one field a reviewer needed. The event decides,
+    # and `redact_fields` removes what must not be stored.
+    evidence = redact(detection.sample(evidence_limit), redact_fields) if store_evidence else []
 
     return CaseResult(
         case=case,
@@ -198,11 +197,6 @@ def classify(
         notes=notes,
         queries=dict(observation.queries),
     )
-
-
-def case_fields(case: ValidationCase) -> Sequence[str]:
-    """Fields to project into evidence. Empty means "let the event decide"."""
-    return ()
 
 
 def _status(outcome: Outcome, expected: Outcome) -> CaseStatus:

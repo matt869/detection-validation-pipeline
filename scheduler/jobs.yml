@@ -7,9 +7,11 @@
 #
 # `dvp` reads nothing from this file at runtime. It exists so the schedule is
 # reviewable in the same repository as the content it runs, and so the systemd
-# units can be generated from one source of truth:
+# drop-ins in scheduler/systemd/generated/ can be generated from one source of
+# truth. Edit a schedule here, then:
 #
-#   python scripts/render_systemd.py > /dev/null   # see the script for usage
+#   python scripts/render_systemd.py           # re-render, and commit the result
+#   python scripts/render_systemd.py --check   # what `make ci` runs
 
 version: 1
 timezone: UTC
