@@ -21,8 +21,7 @@ def result(count: int = 1, *, offset: float = 3.0, anchor=None, truncated: bool 
     events = []
     if anchor is not None:
         events = [
-            Event(raw={"n": i}, timestamp=anchor + timedelta(seconds=offset))
-            for i in range(count)
+            Event(raw={"n": i}, timestamp=anchor + timedelta(seconds=offset)) for i in range(count)
         ]
     else:
         events = [Event(raw={"n": i}) for i in range(count)]
@@ -49,9 +48,7 @@ def test_detection_hits_produce_detected():
 
 
 def test_telemetry_without_detection_is_a_detection_gap():
-    observation = Observation(
-        detection=empty(), telemetry=result(7), emulation=make_emulation()
-    )
+    observation = Observation(detection=empty(), telemetry=result(7), emulation=make_emulation())
     outcome = classify(make_case(), observation)
     assert outcome.outcome is Outcome.VISIBLE
     assert outcome.telemetry_hits == 7
@@ -59,9 +56,7 @@ def test_telemetry_without_detection_is_a_detection_gap():
 
 
 def test_no_telemetry_at_all_is_a_visibility_gap():
-    observation = Observation(
-        detection=empty(), telemetry=empty(), emulation=make_emulation()
-    )
+    observation = Observation(detection=empty(), telemetry=empty(), emulation=make_emulation())
     outcome = classify(make_case(), observation)
     assert outcome.outcome is Outcome.BLIND
     assert "fix collection before tuning the rule" in " ".join(outcome.notes)
@@ -154,9 +149,7 @@ def test_operational_states_are_excluded_from_scoring():
         (1, 5, Outcome.VISIBLE, CaseStatus.UNEXPECTED_PASS),
     ],
 )
-def test_status_compares_observed_against_expected(
-    observed_hits, telemetry_hits, expected, status
-):
+def test_status_compares_observed_against_expected(observed_hits, telemetry_hits, expected, status):
     observation = Observation(
         detection=result(observed_hits) if observed_hits else empty(),
         telemetry=result(telemetry_hits) if telemetry_hits else empty(),
@@ -168,9 +161,7 @@ def test_status_compares_observed_against_expected(
 def test_accepted_gap_passes_without_being_hidden():
     # `expect: blind` records a known, owned gap. It must not page anyone, and
     # it must still show up as BLIND in coverage.
-    observation = Observation(
-        detection=empty(), telemetry=empty(), emulation=make_emulation()
-    )
+    observation = Observation(detection=empty(), telemetry=empty(), emulation=make_emulation())
     outcome = classify(make_case(expected=Outcome.BLIND), observation)
     assert outcome.status is CaseStatus.PASS
     assert outcome.outcome is Outcome.BLIND
@@ -307,8 +298,6 @@ def test_redaction_is_applied_to_stored_evidence():
 
 
 def test_evidence_can_be_disabled_entirely():
-    observation = Observation(
-        detection=result(3), telemetry=result(3), emulation=make_emulation()
-    )
+    observation = Observation(detection=result(3), telemetry=result(3), emulation=make_emulation())
     outcome = classify(make_case(), observation, store_evidence=False)
     assert outcome.evidence == []

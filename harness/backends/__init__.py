@@ -106,7 +106,9 @@ def check_all(settings: Settings, *, names: Iterable[str] | None = None) -> list
             with build_backend(settings, name) as backend:
                 results.append(backend.health())
         except Exception as exc:
-            results.append(HealthStatus(name=name, ok=False, message=f"{type(exc).__name__}: {exc}"))
+            results.append(
+                HealthStatus(name=name, ok=False, message=f"{type(exc).__name__}: {exc}")
+            )
     return results
 
 

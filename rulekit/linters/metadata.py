@@ -53,7 +53,7 @@ class MetadataLinter(Linter):
                 "MD001",
                 Level.ERROR if rule.status is RuleStatus.PRODUCTION else Level.WARNING,
                 "no 'id' - alerts in the SIEM cannot be traced back to this file",
-                hint="Add a UUID4: python -c \"import uuid;print(uuid.uuid4())\"",
+                hint='Add a UUID4: python -c "import uuid;print(uuid.uuid4())"',
                 locator="id",
             )
         elif not _UUID_RE.match(rule.id):
@@ -105,8 +105,7 @@ class MetadataLinter(Linter):
                 "MD011",
                 Level.WARNING,
                 "production rule declares no known false positives",
-                hint="Even 'none observed in 90 days' is useful - it records that "
-                "someone looked.",
+                hint="Even 'none observed in 90 days' is useful - it records that someone looked.",
                 locator="falsepositives",
             )
 
@@ -121,9 +120,7 @@ class MetadataLinter(Linter):
                 locator="author",
             )
         if not rule.date:
-            yield self.finding(
-                rule, "MD006", Level.WARNING, "no 'date'", locator="date"
-            )
+            yield self.finding(rule, "MD006", Level.WARNING, "no 'date'", locator="date")
         if rule.status is RuleStatus.PRODUCTION and not rule.references:
             yield self.finding(
                 rule,

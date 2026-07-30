@@ -97,9 +97,7 @@ def evaluate_gates(
 
     # -- expectation failures ----------------------------------------------
     failed = [
-        r
-        for r in run.results
-        if r.status is CaseStatus.FAIL and r.case.severity >= threshold
+        r for r in run.results if r.status is CaseStatus.FAIL and r.case.severity >= threshold
     ]
     outcome.results.append(
         GateResult(
@@ -143,9 +141,7 @@ def evaluate_gates(
             actual=summary.detection_rate,
             target=settings.min_detection_rate,
             label="detection rate",
-            offenders=tuple(
-                _key(r) for r in run.results if r.outcome is Outcome.VISIBLE
-            )[:20],
+            offenders=tuple(_key(r) for r in run.results if r.outcome is Outcome.VISIBLE)[:20],
         )
     )
 
@@ -179,9 +175,7 @@ def evaluate_gates(
     )
 
     # -- latency ------------------------------------------------------------
-    breached = [
-        r for r in run.results if r.breached_latency and r.case.severity >= threshold
-    ]
+    breached = [r for r in run.results if r.breached_latency and r.case.severity >= threshold]
     outcome.results.append(
         GateResult(
             name="latency-budget",
@@ -206,9 +200,7 @@ def evaluate_gates(
         GateResult(
             name="coverage-targets",
             applicable=(
-                settings.fail_on_coverage_target
-                and coverage is not None
-                and bool(coverage.tactics)
+                settings.fail_on_coverage_target and coverage is not None and bool(coverage.tactics)
             ),
             passed=not critical,
             message=(

@@ -58,9 +58,7 @@ TARGETS = CoverageTargets(
 
 def test_coverage_measures_outcomes_not_rule_counts():
     # Four rules for one technique, none of which fire, is zero coverage.
-    run = make_run(
-        [case_result(Outcome.VISIBLE, rule=f"rule_{i}") for i in range(4)]
-    )
+    run = make_run([case_result(Outcome.VISIBLE, rule=f"rule_{i}") for i in range(4)])
     coverage = build_coverage(run, reference=REFERENCE, targets=TARGETS)
     technique = coverage.techniques["T1059.001"]
     assert len(technique.rules) == 4
@@ -165,9 +163,7 @@ def test_removed_case_is_reported():
 
 
 def test_first_run_reports_only_gaps_not_every_case():
-    current = make_run(
-        [case_result(Outcome.DETECTED), case_result(Outcome.BLIND, rule="b")]
-    )
+    current = make_run([case_result(Outcome.DETECTED), case_result(Outcome.BLIND, rule="b")])
     diff = diff_runs(current, None)
     assert len(diff.deltas) == 1
     assert diff.deltas[0].rule_name == "b"
@@ -233,9 +229,7 @@ def test_accepted_gaps_do_not_fail_the_build():
 
 
 def test_severity_floor_protects_the_build_from_low_severity_noise():
-    run = make_run(
-        [case_result(Outcome.VISIBLE, status=CaseStatus.FAIL, severity=Severity.LOW)]
-    )
+    run = make_run([case_result(Outcome.VISIBLE, status=CaseStatus.FAIL, severity=Severity.LOW)])
     settings = GateSettings(min_severity=Severity.HIGH)
     assert evaluate_gates(run, settings).passed
 
@@ -263,9 +257,7 @@ def test_coverage_gate_is_off_unless_explicitly_enabled():
     run = make_run([case_result(Outcome.VISIBLE)])
     coverage = build_coverage(run, reference=REFERENCE, targets=TARGETS)
     default = evaluate_gates(run, GateSettings(), coverage=coverage)
-    enabled = evaluate_gates(
-        run, GateSettings(fail_on_coverage_target=True), coverage=coverage
-    )
+    enabled = evaluate_gates(run, GateSettings(fail_on_coverage_target=True), coverage=coverage)
     assert default.passed
     assert not enabled.passed
 

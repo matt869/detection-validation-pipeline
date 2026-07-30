@@ -59,7 +59,11 @@ class Severity(str, Enum):
         if isinstance(value, Severity):
             return value
         text = str(value or "").strip().lower()
-        aliases = {"info": cls.INFORMATIONAL, "informational": cls.INFORMATIONAL, "crit": cls.CRITICAL}
+        aliases = {
+            "info": cls.INFORMATIONAL,
+            "informational": cls.INFORMATIONAL,
+            "crit": cls.CRITICAL,
+        }
         if text in aliases:
             return aliases[text]
         try:

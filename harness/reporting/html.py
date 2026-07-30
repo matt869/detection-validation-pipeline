@@ -150,10 +150,7 @@ def _outcome_bar(summary) -> str:
         )
     if not segments:
         return ""
-    return (
-        f'<div class="bar">{"".join(segments)}</div>'
-        f'<div class="legend">{"".join(legend)}</div>'
-    )
+    return f'<div class="bar">{"".join(segments)}</div><div class="legend">{"".join(legend)}</div>'
 
 
 def _gates(gates: GateOutcome | None) -> str:
@@ -173,9 +170,7 @@ def _gates(gates: GateOutcome | None) -> str:
         if gate.offenders:
             items = "".join(f"<li>{escape(o)}</li>" for o in gate.offenders[:8])
             extra = (
-                f"<li>...and {len(gate.offenders) - 8} more</li>"
-                if len(gate.offenders) > 8
-                else ""
+                f"<li>...and {len(gate.offenders) - 8} more</li>" if len(gate.offenders) > 8 else ""
             )
             offenders = f"<ul>{items}{extra}</ul>"
         rows.append(
@@ -191,7 +186,9 @@ def _changes(diff: RunDiff | None) -> str:
         return ""
     header = "<h2>Changes since the previous run</h2>"
     if diff.baseline_run_id:
-        header += f'<p class="note">Compared against <code>{escape(diff.baseline_run_id)}</code>.</p>'
+        header += (
+            f'<p class="note">Compared against <code>{escape(diff.baseline_run_id)}</code>.</p>'
+        )
     rows = "".join(
         "<tr>"
         f'<td><span class="pill {_delta_pill(d.kind.value)}">{escape(d.kind.value)}</span></td>'
@@ -237,7 +234,7 @@ def _gap_table(title: str, results: Iterable[CaseResult], preamble: str) -> str:
             f"<td><code>{escape(result.case.emulation_id)}</code></td>"
             f"<td>{escape(', '.join(result.case.telemetry) or '-')}</td>"
             f'<td><span class="pill {"pass" if accepted else "fail"}">'
-            f'{"accepted" if accepted else "unexpected"}</span></td>'
+            f"{'accepted' if accepted else 'unexpected'}</span></td>"
             f'<td class="note">{escape(note)}</td>'
             "</tr>"
         )
@@ -295,7 +292,7 @@ def _coverage(coverage: CoverageReport | None) -> str:
             f"<td>{_meter(tactic.visibility_rate, tactic.target_visible)}</td>"
             f'<td class="num">{tactic.visibility_rate:.0%}</td>'
             f'<td><span class="pill {"pass" if tactic.meets_target else "fail"}">'
-            f'{"on target" if tactic.meets_target else "below"}</span></td>'
+            f"{'on target' if tactic.meets_target else 'below'}</span></td>"
             "</tr>"
         )
 

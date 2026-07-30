@@ -72,9 +72,7 @@ def serve(
                     )
                 self._respond(status, content_type, body)
                 return
-            self._respond(
-                HTTPStatus.NOT_FOUND, "text/plain; charset=utf-8", f"no route for {path}"
-            )
+            self._respond(HTTPStatus.NOT_FOUND, "text/plain; charset=utf-8", f"no route for {path}")
 
         def _respond(self, status: int, content_type: str, body: str) -> None:
             encoded = body.encode("utf-8")

@@ -89,9 +89,7 @@ class SafetyDecision:
             "allowed": self.allowed,
             "reason": self.reason,
             "blocked_by": self.blocked_by,
-            "checks": [
-                {"name": n, "passed": p, "detail": d} for n, p, d in self.checks
-            ],
+            "checks": [{"name": n, "passed": p, "detail": d} for n, p, d in self.checks],
             "warnings": list(self.warnings),
         }
 
@@ -146,18 +144,12 @@ class SafetyPolicy:
         )
 
         lab_ok = (not self.settings.require_lab_tag) or target.looks_like_lab
-        checks.append(
-            ("lab_tag", lab_ok, f"host '{target.host}' does not look like a lab system")
-        )
+        checks.append(("lab_tag", lab_ok, f"host '{target.host}' does not look like a lab system"))
         if target.looks_like_production:
-            warnings.append(
-                f"target '{target.host}' matches a production naming pattern"
-            )
+            warnings.append(f"target '{target.host}' matches a production naming pattern")
 
         not_denied = not self._technique_matches(test.technique, self.settings.technique_denylist)
-        checks.append(
-            ("technique_denylist", not_denied, f"{test.technique} is on the denylist")
-        )
+        checks.append(("technique_denylist", not_denied, f"{test.technique} is on the denylist"))
 
         in_allowlist = not self.settings.technique_allowlist or self._technique_matches(
             test.technique, self.settings.technique_allowlist
@@ -176,9 +168,7 @@ class SafetyPolicy:
         )
 
         cleanup_ok = (not self.settings.require_cleanup) or test.has_cleanup
-        checks.append(
-            ("cleanup_defined", cleanup_ok, "test defines no cleanup block")
-        )
+        checks.append(("cleanup_defined", cleanup_ok, "test defines no cleanup block"))
 
         automatable = not test.requires_operator
         checks.append(
@@ -208,9 +198,7 @@ class SafetyPolicy:
         )
 
         if not test.safe_mode:
-            warnings.append(
-                "test runs the real technique rather than a benign simulation"
-            )
+            warnings.append("test runs the real technique rather than a benign simulation")
 
         failed = [(name, detail) for name, passed, detail in checks if not passed]
         decision = SafetyDecision(

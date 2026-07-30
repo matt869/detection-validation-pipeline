@@ -95,8 +95,16 @@ def test_rules_lint_is_clean(repo_root, capsys):
 
 def test_rules_lint_across_dialects(repo_root):
     exit_code = run(
-        "rules", "lint", "--level", "error",
-        "--dialect", "splunk", "--dialect", "elastic", "--dialect", "fixture",
+        "rules",
+        "lint",
+        "--level",
+        "error",
+        "--dialect",
+        "splunk",
+        "--dialect",
+        "elastic",
+        "--dialect",
+        "fixture",
         root=repo_root,
     )
     assert exit_code == ExitCode.OK
@@ -114,8 +122,13 @@ def test_rules_compile(repo_root, capsys):
 
 def test_rules_compile_telemetry_probe_has_no_detection_logic(repo_root, capsys):
     run(
-        "rules", "compile", "lsass_memory_access",
-        "--dialect", "splunk", "--telemetry", root=repo_root,
+        "rules",
+        "compile",
+        "lsass_memory_access",
+        "--dialect",
+        "splunk",
+        "--telemetry",
+        root=repo_root,
     )
     out = capsys.readouterr().out
     assert "EventCode=10" in out
@@ -148,9 +161,7 @@ def test_tests_show_warns_that_manual_tests_are_operator_run(repo_root, capsys):
 
 
 def test_plan_only_executes_nothing(repo_root, capsys):
-    assert (
-        run("run", "--profile", "quick-smoke", "--plan-only", root=repo_root) == ExitCode.OK
-    )
+    assert run("run", "--profile", "quick-smoke", "--plan-only", root=repo_root) == ExitCode.OK
     out = capsys.readouterr().out
     assert "Nothing was executed" in out
 
@@ -158,8 +169,12 @@ def test_plan_only_executes_nothing(repo_root, capsys):
 def test_offline_run_passes(tmp_path, repo_root, capsys, monkeypatch):
     monkeypatch.setenv("DVP_STORAGE_PATH", str(tmp_path / "run.sqlite3"))
     exit_code = run(
-        "run", "--profile", "quick-smoke", "--quiet",
-        "--output", str(tmp_path / "reports"),
+        "run",
+        "--profile",
+        "quick-smoke",
+        "--quiet",
+        "--output",
+        str(tmp_path / "reports"),
         root=repo_root,
     )
     assert exit_code == ExitCode.OK
@@ -170,9 +185,16 @@ def test_run_writes_the_requested_formats(tmp_path, repo_root, monkeypatch):
     monkeypatch.setenv("DVP_STORAGE_PATH", str(tmp_path / "run.sqlite3"))
     reports = tmp_path / "reports"
     run(
-        "run", "--profile", "quick-smoke", "--quiet",
-        "--format", "json", "--format", "junit",
-        "--output", str(reports),
+        "run",
+        "--profile",
+        "quick-smoke",
+        "--quiet",
+        "--format",
+        "json",
+        "--format",
+        "junit",
+        "--output",
+        str(reports),
         root=repo_root,
     )
     written = {p.name for p in reports.rglob("*") if p.is_file()}
@@ -192,7 +214,11 @@ def populated(tmp_path, repo_root, monkeypatch):
     """A database with one stored run."""
     monkeypatch.setenv("DVP_STORAGE_PATH", str(tmp_path / "dvp.sqlite3"))
     run(
-        "run", "--profile", "quick-smoke", "--quiet", "--no-report",
+        "run",
+        "--profile",
+        "quick-smoke",
+        "--quiet",
+        "--no-report",
         root=repo_root,
     )
     return repo_root

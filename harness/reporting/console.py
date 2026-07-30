@@ -89,7 +89,13 @@ def print_summary(
     write()
 
     # -- outcome counts ----------------------------------------------------
-    for outcome in (Outcome.DETECTED, Outcome.VISIBLE, Outcome.BLIND, Outcome.ERROR, Outcome.SKIPPED):
+    for outcome in (
+        Outcome.DETECTED,
+        Outcome.VISIBLE,
+        Outcome.BLIND,
+        Outcome.ERROR,
+        Outcome.SKIPPED,
+    ):
         count = summary.by_outcome.get(outcome.value, 0)
         if not count and outcome in (Outcome.ERROR, Outcome.SKIPPED):
             continue
@@ -118,10 +124,7 @@ def print_summary(
         )
     if summary.noisy_rules:
         label = paint("noisy rules", _AMBER, stream=stream)
-        write(
-            f"  {label}       "
-            f"{summary.noisy_rules} rule(s) also match quiet-baseline activity"
-        )
+        write(f"  {label}       {summary.noisy_rules} rule(s) also match quiet-baseline activity")
 
     # -- what to do next ----------------------------------------------------
     detection_gaps = [r for r in run.gaps("detection") if r.status.value != "pass"]

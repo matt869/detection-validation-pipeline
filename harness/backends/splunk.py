@@ -94,9 +94,7 @@ class SplunkBackend(Backend):
         except Exception as exc:
             if not isinstance(exc, httpx.HTTPError):
                 raise
-            return QueryResult.failed(
-                describe_http_error(exc), query=spl, backend=self.name
-            )
+            return QueryResult.failed(describe_http_error(exc), query=spl, backend=self.name)
 
         events = list(self._parse_export(response.text, cap))
         return QueryResult(
@@ -119,9 +117,7 @@ class SplunkBackend(Backend):
         text = str(query.payload)
         if "| stats count" not in text:
             text = f"{text} | stats count"
-        counting = CompiledQuery(
-            dialect=self.dialect, kind=query.kind, text=text, payload=text
-        )
+        counting = CompiledQuery(dialect=self.dialect, kind=query.kind, text=text, payload=text)
         result = self.search(counting, window, limit=1)
         if not result.ok or not result.events:
             return 0

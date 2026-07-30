@@ -277,9 +277,7 @@ def _score_attack(rule: Rule, context: ScoringContext) -> DimensionScore:
             deductions.append(f"unmapped technique(s): {', '.join(unknown)}")
 
     parents_with_children = [
-        t
-        for t in techniques
-        if "." not in t and (context.attack.get(t) or {}).get("subtechniques")
+        t for t in techniques if "." not in t and (context.attack.get(t) or {}).get("subtechniques")
     ]
     if parents_with_children:
         score -= 15

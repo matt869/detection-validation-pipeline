@@ -165,9 +165,11 @@ def test_deleting_a_run_cascades(store):
     run = make_run([result()])
     store.save_run(run)
     store.connect().execute("DELETE FROM runs WHERE run_id = ?", (run.run_id,))
-    remaining = store.connect().execute(
-        "SELECT COUNT(*) AS n FROM cases WHERE run_id = ?", (run.run_id,)
-    ).fetchone()["n"]
+    remaining = (
+        store.connect()
+        .execute("SELECT COUNT(*) AS n FROM cases WHERE run_id = ?", (run.run_id,))
+        .fetchone()["n"]
+    )
     assert remaining == 0
 
 

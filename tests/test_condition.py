@@ -36,9 +36,7 @@ def test_not_applies_to_parenthesised_group():
 
 
 def test_keywords_are_case_insensitive():
-    assert parse_condition("a AND NOT b", ["a", "b"]) == parse_condition(
-        "a and not b", ["a", "b"]
-    )
+    assert parse_condition("a AND NOT b", ["a", "b"]) == parse_condition("a and not b", ["a", "b"])
 
 
 @pytest.mark.parametrize(

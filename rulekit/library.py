@@ -155,9 +155,7 @@ class RuleLibrary:
         return {
             "total": len(self.rules),
             "active": sum(1 for r in self.rules.values() if r.is_active),
-            "production": sum(
-                1 for r in self.rules.values() if r.status is RuleStatus.PRODUCTION
-            ),
+            "production": sum(1 for r in self.rules.values() if r.status is RuleStatus.PRODUCTION),
             "with_validation": sum(1 for r in self.rules.values() if r.validation.emulation),
             "techniques": len(self.by_technique()),
             "errors": len(self.errors),
@@ -197,8 +195,7 @@ def load_library(
 
         if rule.name in seen_names:
             message = (
-                f"duplicate rule name '{rule.name}' (already defined in "
-                f"{seen_names[rule.name]})"
+                f"duplicate rule name '{rule.name}' (already defined in {seen_names[rule.name]})"
             )
             if strict:
                 raise RuleError(message, path=str(path))

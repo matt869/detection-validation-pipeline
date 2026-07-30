@@ -182,12 +182,10 @@ class Store:
             except sqlite3.Error as exc:
                 raise StorageError(
                     f"migration {version} failed: {exc}",
-                    hint="Migrations are idempotent; fix the SQL and re-run "
-                    "`dvp db migrate`.",
+                    hint="Migrations are idempotent; fix the SQL and re-run `dvp db migrate`.",
                 ) from exc
             connection.execute(
-                "INSERT INTO schema_migrations (version, applied_at, checksum) "
-                "VALUES (?, ?, ?)",
+                "INSERT INTO schema_migrations (version, applied_at, checksum) VALUES (?, ?, ?)",
                 (version, to_iso(utcnow()), checksum),
             )
             performed.append(version)
@@ -451,9 +449,7 @@ class Store:
         )
         return [_stored_run(row) for row in rows]
 
-    def latest_run_id(
-        self, *, profile: str | None = None, before: str | None = None
-    ) -> str | None:
+    def latest_run_id(self, *, profile: str | None = None, before: str | None = None) -> str | None:
         clauses: list[str] = []
         params: list[Any] = []
         if profile:
@@ -463,16 +459,16 @@ class Store:
             clauses.append("run_id != ?")
             params.append(before)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-        row = self.connect().execute(
-            f"SELECT run_id FROM runs {where} ORDER BY started_at DESC LIMIT 1", params
-        ).fetchone()
+        row = (
+            self.connect()
+            .execute(f"SELECT run_id FROM runs {where} ORDER BY started_at DESC LIMIT 1", params)
+            .fetchone()
+        )
         return row["run_id"] if row else None
 
     def load_run(self, run_id: str) -> RunRecord | None:
         connection = self.connect()
-        run_row = connection.execute(
-            "SELECT * FROM runs WHERE run_id = ?", (run_id,)
-        ).fetchone()
+        run_row = connection.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
         if run_row is None:
             return None
 
@@ -488,15 +484,11 @@ class Store:
                 cleanup_performed=bool(row["cleanup_performed"]),
                 error=row["error"],
             )
-            for row in connection.execute(
-                "SELECT * FROM emulations WHERE run_id = ?", (run_id,)
-            )
+            for row in connection.execute("SELECT * FROM emulations WHERE run_id = ?", (run_id,))
         }
 
         attack: dict[str, list[AttackRef]] = {}
-        for row in connection.execute(
-            "SELECT * FROM case_attack WHERE run_id = ?", (run_id,)
-        ):
+        for row in connection.execute("SELECT * FROM case_attack WHERE run_id = ?", (run_id,)):
             attack.setdefault(row["case_id"], []).append(
                 AttackRef(technique=row["technique"], tactic=row["tactic"])
             )
@@ -559,17 +551,20 @@ class Store:
 
     def previous_run(self, run: RunRecord) -> RunRecord | None:
         """The most recent run of the same profile before this one."""
-        row = self.connect().execute(
-            "SELECT run_id FROM runs WHERE profile = ? AND started_at < ? "
-            "ORDER BY started_at DESC LIMIT 1",
-            (run.profile, to_iso(run.started_at)),
-        ).fetchone()
+        row = (
+            self.connect()
+            .execute(
+                "SELECT run_id FROM runs WHERE profile = ? AND started_at < ? "
+                "ORDER BY started_at DESC LIMIT 1",
+                (run.profile, to_iso(run.started_at)),
+            )
+            .fetchone()
+        )
         return self.load_run(row["run_id"]) if row else None
 
     def rule_history(self, rule_name: str, *, limit: int = 30) -> list[dict[str, Any]]:
         rows = self.connect().execute(
-            "SELECT * FROM rule_history WHERE rule_name = ? "
-            "ORDER BY started_at DESC LIMIT ?",
+            "SELECT * FROM rule_history WHERE rule_name = ? ORDER BY started_at DESC LIMIT ?",
             (rule_name, limit),
         )
         return [dict(row) for row in rows][::-1]
@@ -577,9 +572,11 @@ class Store:
     def latest_outcomes(self) -> dict[str, str]:
         """Rule name -> most recent outcome, used by the scorecard."""
         try:
-            rows = self.connect().execute(
-                "SELECT rule_name, outcome, run_started_at FROM latest_case_outcomes"
-            ).fetchall()
+            rows = (
+                self.connect()
+                .execute("SELECT rule_name, outcome, run_started_at FROM latest_case_outcomes")
+                .fetchall()
+            )
         except sqlite3.OperationalError:
             return {}
 

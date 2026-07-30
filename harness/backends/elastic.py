@@ -197,9 +197,7 @@ class ElasticBackend(Backend):
         except Exception as exc:
             if not isinstance(exc, (httpx.HTTPError, ValueError)):
                 raise
-            message = (
-                describe_http_error(exc) if isinstance(exc, httpx.HTTPError) else str(exc)
-            )
+            message = describe_http_error(exc) if isinstance(exc, httpx.HTTPError) else str(exc)
             return HealthStatus(name=self.name, ok=False, message=message)
 
         version = (payload.get("version") or {}).get("number", "unknown")

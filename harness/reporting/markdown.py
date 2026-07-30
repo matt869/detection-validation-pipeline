@@ -55,9 +55,7 @@ def render_markdown(
         f"| Detected | {summary.by_outcome.get('detected', 0)} "
         f"({summary.detection_rate:.0%} of scoreable) |"
     )
-    lines.append(
-        f"| Detection gaps (visible) | {summary.by_outcome.get('visible', 0)} |"
-    )
+    lines.append(f"| Detection gaps (visible) | {summary.by_outcome.get('visible', 0)} |")
     lines.append(f"| Visibility gaps (blind) | {summary.by_outcome.get('blind', 0)} |")
     if summary.by_outcome.get("error"):
         lines.append(f"| Errored | {summary.by_outcome['error']} |")
@@ -129,16 +127,13 @@ def render_markdown(
     if noise:
         lines.append("## Baseline noise")
         lines.append("")
-        lines.append(
-            "These rules matched activity in a window where nothing was emulated."
-        )
+        lines.append("These rules matched activity in a window where nothing was emulated.")
         lines.append("")
         lines.append("| Rule | Hits | Accepted | Severity |")
         lines.append("|---|---|---|---|")
         for finding in noise:
             lines.append(
-                f"| `{finding.rule}` | {finding.hits} | {finding.allowance} | "
-                f"{finding.severity} |"
+                f"| `{finding.rule}` | {finding.hits} | {finding.allowance} | {finding.severity} |"
             )
         lines.append("")
 
@@ -199,9 +194,7 @@ def _gap_section(title: str, results: Iterable[CaseResult], preamble: str) -> li
     lines = [f"## {title} ({len(results)})", "", preamble, ""]
     lines.append("| Rule | Severity | Test | Telemetry | Expected | Note |")
     lines.append("|---|---|---|---|---|---|")
-    for result in sorted(
-        results, key=lambda r: (-r.case.severity.rank, r.case.rule_name)
-    ):
+    for result in sorted(results, key=lambda r: (-r.case.severity.rank, r.case.rule_name)):
         note = result.notes[0] if result.notes else ""
         if len(note) > 90:
             note = note[:87] + "..."

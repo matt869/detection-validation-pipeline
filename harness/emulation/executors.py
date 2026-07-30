@@ -37,7 +37,14 @@ log = get_logger("emulation")
 #: Command templates per executor. Every one is non-interactive, and none uses
 #: a shell string that the harness itself interpolates user data into.
 _SHELLS: dict[str, Sequence[str]] = {
-    "powershell": ("powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"),
+    "powershell": (
+        "powershell",
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+    ),
     "cmd": ("cmd", "/d", "/c"),
     "bash": ("bash", "-c"),
     "sh": ("sh", "-c"),
@@ -51,8 +58,9 @@ class Executor(ABC):
     mode: str = "abstract"
 
     @abstractmethod
-    def run(self, test: EmulationTest, target: Target, decision: SafetyDecision) -> EmulationResult:
-        ...
+    def run(
+        self, test: EmulationTest, target: Target, decision: SafetyDecision
+    ) -> EmulationResult: ...
 
     def _skeleton(self, test: EmulationTest, target: Target) -> EmulationResult:
         return EmulationResult(
@@ -146,9 +154,7 @@ class LocalExecutor(Executor):
             return result
 
         started = utcnow()
-        log.warning(
-            "executing %s on %s (safe_mode=%s)", test.id, target.host, test.safe_mode
-        )
+        log.warning("executing %s on %s (safe_mode=%s)", test.id, target.host, test.safe_mode)
         completed = _invoke(
             [*argv, test.command],
             timeout=min(self.timeout, test.timeout_seconds),

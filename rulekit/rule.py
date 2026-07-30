@@ -222,7 +222,11 @@ class Rule:
         """Hash of the *logic* only. Editing the description does not change it,
         so ``dvp rules diff`` reports behavioural changes and ignores prose."""
         return content_fingerprint(
-            {"detection": self.detection, "logsource": self.logsource, "telemetry": list(self.telemetry)}
+            {
+                "detection": self.detection,
+                "logsource": self.logsource,
+                "telemetry": list(self.telemetry),
+            }
         )
 
     @property
@@ -407,7 +411,14 @@ def _parse_attack(value: Any, context: str) -> tuple[AttackRef, ...]:
             techniques = [techniques]
         for item in techniques:
             if isinstance(item, Mapping):
-                refs.append(_attack_ref(item.get("id") or item.get("technique"), item.get("tactic") or (tactics[0] if tactics else None), context, name=item.get("name")))
+                refs.append(
+                    _attack_ref(
+                        item.get("id") or item.get("technique"),
+                        item.get("tactic") or (tactics[0] if tactics else None),
+                        context,
+                        name=item.get("name"),
+                    )
+                )
             else:
                 refs.append(_attack_ref(item, tactics[0] if tactics else None, context))
         # A tactic with no technique is still coverage information.
@@ -432,9 +443,7 @@ def _parse_attack(value: Any, context: str) -> tuple[AttackRef, ...]:
     return tuple(r for r in refs if r.technique or r.tactic)
 
 
-def _attack_ref(
-    technique: Any, tactic: Any, context: str, *, name: Any = None
-) -> AttackRef:
+def _attack_ref(technique: Any, tactic: Any, context: str, *, name: Any = None) -> AttackRef:
     text = str(technique or "").strip().upper()
     if text and not _TECHNIQUE_RE.match(text):
         raise RuleError(

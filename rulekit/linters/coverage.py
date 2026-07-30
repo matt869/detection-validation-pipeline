@@ -164,11 +164,7 @@ class TelemetryLinter(Linter):
         if declared_fields and all(
             context.catalog.get(s) and context.catalog.require(s).fields for s in rule.telemetry
         ):
-            unknown = [
-                name
-                for name in rule.field_names
-                if name.casefold() not in declared_fields
-            ]
+            unknown = [name for name in rule.field_names if name.casefold() not in declared_fields]
             if unknown:
                 yield self.finding(
                     rule,

@@ -29,9 +29,9 @@ from harness.core.timeutil import (
         ("2026-05-14T09:12:00.123Z", 2026),
         ("2026-05-14T09:12:00+02:00", 2026),
         ("2026-05-14 09:12:00", 2026),
-        (1778751120, 2026),          # epoch seconds
-        (1778751120000, 2026),       # epoch milliseconds
-        ("1778751120", 2026),        # numeric string
+        (1778751120, 2026),  # epoch seconds
+        (1778751120000, 2026),  # epoch milliseconds
+        ("1778751120", 2026),  # numeric string
     ],
 )
 def test_timestamp_parsing_handles_backend_variety(value, expected_year):

@@ -144,9 +144,7 @@ def _add_run(sub) -> None:
     parser.add_argument(
         "--no-compare", action="store_true", help="skip the diff against the previous run"
     )
-    parser.add_argument(
-        "--quiet", "-q", action="store_true", help="only print the final summary"
-    )
+    parser.add_argument("--quiet", "-q", action="store_true", help="only print the final summary")
     parser.add_argument("--verbose", "-v", action="store_true", help="include coverage detail")
     parser.set_defaults(handler=_cmd_run)
 
@@ -303,9 +301,7 @@ def _add_rules(sub) -> None:
     _add_selection_flags(score)
     score.add_argument("--json", action="store_true")
     score.add_argument("--explain", action="store_true", help="show per-dimension deductions")
-    score.add_argument(
-        "--min", type=float, default=0.0, help="fail if any rule scores below this"
-    )
+    score.add_argument("--min", type=float, default=0.0, help="fail if any rule scores below this")
     score.set_defaults(handler=_cmd_rules_score)
 
 
@@ -535,9 +531,7 @@ def _cmd_rules_score(args: argparse.Namespace) -> int:
     try:
         with workspace.store() as store:
             if store.is_initialised():
-                outcomes = {
-                    name: Outcome(value) for name, value in store.latest_outcomes().items()
-                }
+                outcomes = {name: Outcome(value) for name, value in store.latest_outcomes().items()}
     except DvpError as exc:
         log.debug("no run history available: %s", exc)
 
@@ -725,9 +719,7 @@ def _cmd_coverage(args: argparse.Namespace) -> int:
 
     workspace = Workspace.load(args.root)
     run = _load_run(workspace, args.run)
-    coverage = build_coverage(
-        run, reference=workspace.attack, targets=workspace.targets
-    )
+    coverage = build_coverage(run, reference=workspace.attack, targets=workspace.targets)
 
     if args.navigator:
         args.navigator.parent.mkdir(parents=True, exist_ok=True)
@@ -941,9 +933,7 @@ def _cmd_runs_diff(args: argparse.Namespace) -> int:
     workspace = Workspace.load(args.root)
     current = _load_run(workspace, args.current)
     with workspace.store() as store:
-        previous = (
-            store.load_run(args.previous) if args.previous else store.previous_run(current)
-        )
+        previous = store.load_run(args.previous) if args.previous else store.previous_run(current)
 
     if previous is None:
         print("no earlier run to compare against")
@@ -1037,9 +1027,7 @@ def _add_fixtures(sub) -> None:
     listing = fixtures.add_parser("list", help="list corpora")
     listing.set_defaults(handler=_cmd_fixtures_list)
 
-    verify = fixtures.add_parser(
-        "verify", help="check corpora against the emulation catalogue"
-    )
+    verify = fixtures.add_parser("verify", help="check corpora against the emulation catalogue")
     verify.set_defaults(handler=_cmd_fixtures_verify)
 
 
@@ -1125,9 +1113,7 @@ def _cmd_dashboard(args: argparse.Namespace) -> int:
 
 def _add_doctor(sub) -> None:
     parser = sub.add_parser("doctor", help="check configuration, content, and backends")
-    parser.add_argument(
-        "--backends", action="store_true", help="also health-check every backend"
-    )
+    parser.add_argument("--backends", action="store_true", help="also health-check every backend")
     parser.set_defaults(handler=_cmd_doctor)
 
 
@@ -1307,8 +1293,10 @@ def _dir_status(path: Path) -> str:
 
 
 def _operator() -> str:
-    return os.environ.get("DVP_OPERATOR") or os.environ.get("USER") or os.environ.get(
-        "USERNAME", "unknown"
+    return (
+        os.environ.get("DVP_OPERATOR")
+        or os.environ.get("USER")
+        or os.environ.get("USERNAME", "unknown")
     )
 
 

@@ -97,7 +97,9 @@ def test_host_not_on_the_allowlist_is_refused():
 
 def test_host_allowlist_matches_globs_and_short_names():
     settings = authorised(host_allowlist=["wks-lab-*"])
-    assert evaluate(settings, target=Target(host="wks-lab-014.corp.example", platform="windows")).allowed
+    assert evaluate(
+        settings, target=Target(host="wks-lab-014.corp.example", platform="windows")
+    ).allowed
 
 
 def test_non_lab_host_is_refused_by_default():
@@ -159,9 +161,7 @@ def test_platform_mismatch_is_refused():
 
 
 def test_failure_budget_stops_a_run_that_is_going_wrong():
-    policy = SafetyPolicy(
-        settings=authorised(max_failures=2), execution_requested=True
-    )
+    policy = SafetyPolicy(settings=authorised(max_failures=2), execution_requested=True)
     assert policy.evaluate(make_test(), LAB).allowed
     policy.record_failure()
     policy.record_failure()

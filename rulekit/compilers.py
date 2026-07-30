@@ -568,7 +568,11 @@ class KqlCompiler(QueryCompiler):
 
         # Kusto is strongly typed: comparing an int column with a string literal
         # is an error, not a coercion. Numeric literals stay numeric.
-        if comparison == "equals" and isinstance(value, (int, float)) and not isinstance(value, bool):
+        if (
+            comparison == "equals"
+            and isinstance(value, (int, float))
+            and not isinstance(value, bool)
+        ):
             return f"{field_name} == {value}"
 
         text = str(value)

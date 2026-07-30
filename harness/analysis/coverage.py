@@ -51,15 +51,11 @@ class AttackReference:
         return str(parent.get("name")) if parent else technique
 
     def tactics_for(self, technique: str) -> list[str]:
-        entry = self.techniques.get(technique) or self.techniques.get(
-            technique.split(".", 1)[0]
-        )
+        entry = self.techniques.get(technique) or self.techniques.get(technique.split(".", 1)[0])
         return [str(t) for t in (entry or {}).get("tactics", [])]
 
     def telemetry_for(self, technique: str) -> list[str]:
-        entry = self.techniques.get(technique) or self.techniques.get(
-            technique.split(".", 1)[0]
-        )
+        entry = self.techniques.get(technique) or self.techniques.get(technique.split(".", 1)[0])
         return [str(t) for t in (entry or {}).get("telemetry", [])]
 
     def tactic_name(self, tactic: str) -> str:
@@ -101,9 +97,7 @@ class CoverageTargets:
         target applies, because a technique that serves two tactics should be
         held to the higher bar of the two.
         """
-        entry = self.techniques.get(technique) or self.techniques.get(
-            technique.split(".", 1)[0]
-        )
+        entry = self.techniques.get(technique) or self.techniques.get(technique.split(".", 1)[0])
         if entry:
             return (
                 float(entry.get("detected", self.default_detected)),
@@ -324,8 +318,7 @@ class CoverageReport:
             "visibility_rate": round(self.visibility_rate, 4),
             "techniques": {k: v.to_dict() for k, v in sorted(self.techniques.items())},
             "tactics": {
-                k: v.to_dict()
-                for k, v in sorted(self.tactics.items(), key=lambda kv: kv[1].order)
+                k: v.to_dict() for k, v in sorted(self.tactics.items(), key=lambda kv: kv[1].order)
             },
             "excluded": dict(self.excluded),
         }

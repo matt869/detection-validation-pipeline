@@ -80,9 +80,7 @@ def render_junit(run: RunRecord, *, suite_name: str = "detection-validation") ->
         )
 
         detail = "\n".join(result.notes)
-        message = (
-            f"expected {result.case.expected.value}, observed {result.outcome.value}"
-        )
+        message = f"expected {result.case.expected.value}, observed {result.outcome.value}"
 
         if result.status is CaseStatus.FAIL:
             failure = ET.SubElement(
@@ -108,9 +106,7 @@ def render_junit(run: RunRecord, *, suite_name: str = "detection-validation") ->
             out.text = detail
 
     ET.indent(suites, space="  ")
-    return '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(
-        suites, encoding="unicode"
-    )
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(suites, encoding="unicode")
 
 
 def _body(result, detail: str) -> str:

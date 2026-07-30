@@ -82,11 +82,11 @@ def render_index(runs: Sequence[Any], latest: RunRecord | None) -> str:
         summary = latest.summarise()
         summary_block = (
             f'<div class="tiles">'
-            f'{_tile("Latest run", latest.run_id[-6:], latest.profile)}'
-            f'{_tile("Detected", str(summary.by_outcome.get("detected", 0)), f"{summary.detection_rate:.0%}", css="detected")}'
-            f'{_tile("Detection gaps", str(summary.by_outcome.get("visible", 0)), "rule silent", css="visible")}'
-            f'{_tile("Visibility gaps", str(summary.by_outcome.get("blind", 0)), "no telemetry", css="blind")}'
-            f'{_tile("Visibility", f"{summary.visibility_rate:.0%}", "of scoreable")}'
+            f"{_tile('Latest run', latest.run_id[-6:], latest.profile)}"
+            f"{_tile('Detected', str(summary.by_outcome.get('detected', 0)), f'{summary.detection_rate:.0%}', css='detected')}"
+            f"{_tile('Detection gaps', str(summary.by_outcome.get('visible', 0)), 'rule silent', css='visible')}"
+            f"{_tile('Visibility gaps', str(summary.by_outcome.get('blind', 0)), 'no telemetry', css='blind')}"
+            f"{_tile('Visibility', f'{summary.visibility_rate:.0%}', 'of scoreable')}"
             f"</div>"
             f"{_outcome_bar(summary)}"
         )
@@ -128,11 +128,11 @@ def render_run(run: RunRecord, workspace) -> str:
 
     tiles = (
         f'<div class="tiles">'
-        f'{_tile("Cases", str(summary.total), run.profile)}'
-        f'{_tile("Detected", str(summary.by_outcome.get("detected", 0)), f"{summary.detection_rate:.0%}", css="detected")}'
-        f'{_tile("Detection gaps", str(summary.by_outcome.get("visible", 0)), "rule silent", css="visible")}'
-        f'{_tile("Visibility gaps", str(summary.by_outcome.get("blind", 0)), "no telemetry", css="blind")}'
-        f'{_tile("Latency p50", format_duration(summary.latency_p50), f"p95 {format_duration(summary.latency_p95)}")}'
+        f"{_tile('Cases', str(summary.total), run.profile)}"
+        f"{_tile('Detected', str(summary.by_outcome.get('detected', 0)), f'{summary.detection_rate:.0%}', css='detected')}"
+        f"{_tile('Detection gaps', str(summary.by_outcome.get('visible', 0)), 'rule silent', css='visible')}"
+        f"{_tile('Visibility gaps', str(summary.by_outcome.get('blind', 0)), 'no telemetry', css='blind')}"
+        f"{_tile('Latency p50', format_duration(summary.latency_p50), f'p95 {format_duration(summary.latency_p95)}')}"
         f"</div>"
     )
 
@@ -152,9 +152,7 @@ def render_run(run: RunRecord, workspace) -> str:
         )
         evidence = ""
         if result.evidence:
-            items = "".join(
-                f"<pre>{escape(_compact(row))}</pre>" for row in result.evidence[:3]
-            )
+            items = "".join(f"<pre>{escape(_compact(row))}</pre>" for row in result.evidence[:3])
             evidence = f"<div class='evidence'><b>evidence</b>{items}</div>"
 
         rows.append(
@@ -219,12 +217,12 @@ def render_rule(rule_name: str, history: Sequence[dict[str, Any]], rule) -> str:
     rows = "".join(
         "<tr>"
         f'<td><a href="/run/{escape(str(row.get("run_id")))}">'
-        f'<code>{escape(str(row.get("run_id")))}</code></a></td>'
+        f"<code>{escape(str(row.get('run_id')))}</code></a></td>"
         f'<td class="mono">{escape(str(row.get("started_at") or "")[:19].replace("T", " "))}</td>'
-        f'<td>{escape(str(row.get("profile") or ""))}</td>'
-        f'<td><code>{escape(str(row.get("emulation_id") or ""))}</code></td>'
+        f"<td>{escape(str(row.get('profile') or ''))}</td>"
+        f"<td><code>{escape(str(row.get('emulation_id') or ''))}</code></td>"
         f'<td><span class="pill {escape(str(row.get("outcome")))}">'
-        f'{escape(str(row.get("outcome")))}</span></td>'
+        f"{escape(str(row.get('outcome')))}</span></td>"
         f'<td class="num">{escape(format_duration(row.get("latency_seconds")))}</td>'
         "</tr>"
         for row in reversed(history)
@@ -264,7 +262,7 @@ def render_rules(workspace, outcomes: dict[str, str]) -> str:
         f"<td>{escape(', '.join(rule.technique_ids) or '-')}</td>"
         f"<td>{escape(rule.validation.expect.value)}</td>"
         f'<td><span class="pill {escape(outcomes.get(rule.name, "skipped"))}">'
-        f'{escape(outcomes.get(rule.name, "untested"))}</span></td>'
+        f"{escape(outcomes.get(rule.name, 'untested'))}</span></td>"
         "</tr>"
         for rule in sorted(workspace.rules, key=lambda r: r.name)
     )
@@ -283,16 +281,14 @@ def render_coverage(run: RunRecord, workspace) -> str:
     coverage = build_coverage(run, reference=workspace.attack, targets=workspace.targets)
     body = (
         f'<div class="tiles">'
-        f'{_tile("Detection", f"{coverage.detection_rate:.0%}", "of scoreable cases", css="detected")}'
-        f'{_tile("Visibility", f"{coverage.visibility_rate:.0%}", "telemetry arrived")}'
-        f'{_tile("Techniques", str(len(coverage.techniques)), "measured")}'
+        f"{_tile('Detection', f'{coverage.detection_rate:.0%}', 'of scoreable cases', css='detected')}"
+        f"{_tile('Visibility', f'{coverage.visibility_rate:.0%}', 'telemetry arrived')}"
+        f"{_tile('Techniques', str(len(coverage.techniques)), 'measured')}"
         f"</div>"
         f"{_coverage_table(coverage)}"
         f"{_technique_table(coverage)}"
     )
-    return _page(
-        "Coverage", _nav("coverage"), body, subtitle=f"from {run.run_id} ({run.profile})"
-    )
+    return _page("Coverage", _nav("coverage"), body, subtitle=f"from {run.run_id} ({run.profile})")
 
 
 def _coverage_table(coverage) -> str:
@@ -306,7 +302,7 @@ def _coverage_table(coverage) -> str:
         f"<td>{_meter(t.visibility_rate, t.target_visible)}</td>"
         f'<td class="num">{t.visibility_rate:.0%}</td>'
         f'<td><span class="pill {"pass" if t.meets_target else "fail"}">'
-        f'{"on target" if t.meets_target else "below"}</span></td>'
+        f"{'on target' if t.meets_target else 'below'}</span></td>"
         "</tr>"
         for t in sorted(coverage.tactics.values(), key=lambda t: t.order)
         if t.scoreable
@@ -330,7 +326,7 @@ def _technique_table(coverage) -> str:
         f'<td class="num detected">{t.detected}</td>'
         f'<td class="num visible">{t.visible}</td>'
         f'<td class="num blind">{t.blind}</td>'
-        f'<td>{escape(", ".join(t.rules))}</td>'
+        f"<td>{escape(', '.join(t.rules))}</td>"
         f'<td class="note">{escape(", ".join(t.missing_telemetry))}</td>'
         "</tr>"
         for t in coverage.by_priority()
@@ -395,9 +391,7 @@ def _gate_pill(passed: bool | None) -> str:
     if passed is None:
         return '<span class="pill skipped">n/a</span>'
     return (
-        '<span class="pill pass">pass</span>'
-        if passed
-        else '<span class="pill fail">fail</span>'
+        '<span class="pill pass">pass</span>' if passed else '<span class="pill fail">fail</span>'
     )
 
 

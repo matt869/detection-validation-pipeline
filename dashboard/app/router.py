@@ -65,9 +65,7 @@ def build_routes(workspace) -> list[tuple[re.Pattern[str], Callable]]:
     def coverage_view():
         run = _latest_run()
         if run is None:
-            return html_response(
-                render_error(404, "no runs stored yet"), HTTPStatus.NOT_FOUND
-            )
+            return html_response(render_error(404, "no runs stored yet"), HTTPStatus.NOT_FOUND)
         return html_response(render_coverage(run, workspace))
 
     # -- JSON -----------------------------------------------------------
@@ -87,9 +85,7 @@ def build_routes(workspace) -> list[tuple[re.Pattern[str], Callable]]:
         run = _latest_run()
         if run is None:
             return (HTTPStatus.NOT_FOUND, "application/json", '{"error":"no runs"}')
-        coverage = build_coverage(
-            run, reference=workspace.attack, targets=workspace.targets
-        )
+        coverage = build_coverage(run, reference=workspace.attack, targets=workspace.targets)
         return json_response(coverage.to_dict())
 
     def healthz():

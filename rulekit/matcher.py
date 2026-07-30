@@ -419,7 +419,9 @@ def _numeric_matcher(comparison: str, candidate: Any) -> Callable[[Any], bool]:
         number = _coerce_number(observed)
         if number is None:
             # Fall back to string equality so `Status: "0x5"` still works.
-            return comparison == "eq" and _stringify(observed).casefold() == str(candidate).casefold()
+            return (
+                comparison == "eq" and _stringify(observed).casefold() == str(candidate).casefold()
+            )
         return operator(number, threshold)
 
     return compare

@@ -36,8 +36,7 @@ def catalog() -> TelemetryCatalog:
 
     return TelemetryCatalog(
         sources={
-            key: TelemetrySource.from_dict(key, value)
-            for key, value in CATALOG_SOURCES.items()
+            key: TelemetrySource.from_dict(key, value) for key, value in CATALOG_SOURCES.items()
         }
     )
 
@@ -120,9 +119,7 @@ def test_splunk_switches_to_where_for_regex(catalog):
 
 
 def test_splunk_exists_uses_search_idiom_not_eval(catalog):
-    rule = build_rule(
-        detection={"selection": {"errorCode|exists": True}, "condition": "selection"}
-    )
+    rule = build_rule(detection={"selection": {"errorCode|exists": True}, "condition": "selection"})
     text = get_compiler("splunk", catalog).compile(rule).text
     # isnotnull() is an eval function and is invalid in search mode.
     assert "errorCode=*" in text
@@ -143,9 +140,7 @@ def test_elastic_quotes_plain_values_and_leaves_wildcards_bare(catalog):
 
 
 def test_elastic_renders_numeric_ranges(catalog):
-    rule = build_rule(
-        detection={"selection": {"Count|gte": 5}, "condition": "selection"}
-    )
+    rule = build_rule(detection={"selection": {"Count|gte": 5}, "condition": "selection"})
     assert "Count:[5.0 TO *]" in get_compiler("elastic", catalog).compile(rule).text
 
 

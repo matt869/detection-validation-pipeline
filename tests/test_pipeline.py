@@ -60,9 +60,7 @@ def test_plan_carries_the_rule_expectation(workspace):
 
 def test_plan_only_executes_nothing(workspace):
     pipeline = Pipeline(workspace)
-    result = pipeline.run(
-        workspace.profiles.require("quick-smoke"), plan_only=True, compare=False
-    )
+    result = pipeline.run(workspace.profiles.require("quick-smoke"), plan_only=True, compare=False)
     assert result.plan_only
     assert result.run.results == []
 
@@ -112,9 +110,7 @@ def test_documented_visibility_gap_reports_blind_and_passes(smoke_result):
 
 def test_latency_is_measured_from_the_recorded_offsets(smoke_result):
     lsass = next(
-        r
-        for r in smoke_result.run.results
-        if r.case.emulation_id == "T1003.001-lsass-handle-open"
+        r for r in smoke_result.run.results if r.case.emulation_id == "T1003.001-lsass-handle-open"
     )
     # The corpus records the malicious handle open at +9s.
     assert lsass.latency_seconds == pytest.approx(9.0, abs=1.0)
@@ -133,18 +129,14 @@ def test_cloud_latency_survives_a_window_wider_than_post_window(smoke_result):
 def test_attribution_prevents_cross_test_credit(smoke_result):
     # mshta and rundll32 both produce Sysmon EID 1 within seconds of each other.
     # Without attribution one would be credited with the other's telemetry.
-    mshta = next(
-        r for r in smoke_result.run.results if r.case.rule_name == "mshta_remote_payload"
-    )
+    mshta = next(r for r in smoke_result.run.results if r.case.rule_name == "mshta_remote_payload")
     assert mshta.detection_hits == 1
 
 
 def test_baseline_noise_is_measured(smoke_result):
     # run_key_persistence matches a Teams autostart entry in the baseline
     # corpus. A rule can be detected and noisy at the same time.
-    run_key = next(
-        r for r in smoke_result.run.results if r.case.rule_name == "run_key_persistence"
-    )
+    run_key = next(r for r in smoke_result.run.results if r.case.rule_name == "run_key_persistence")
     assert run_key.outcome is Outcome.DETECTED
     assert run_key.is_noisy
     assert run_key.baseline_hits == 1
@@ -154,9 +146,7 @@ def test_accepted_noise_is_measured_but_not_reported_as_a_finding(smoke_result):
     # windows-workstation accepts up to 2 hits for this rule, with a reason, an
     # owner and a review date. Measuring it and reporting it are different
     # things: the hit still shows on the case, but nobody is paged for it.
-    run_key = next(
-        r for r in smoke_result.run.results if r.case.rule_name == "run_key_persistence"
-    )
+    run_key = next(r for r in smoke_result.run.results if r.case.rule_name == "run_key_persistence")
     assert run_key.is_noisy
     assert [f for f in smoke_result.noise if f.rule == "run_key_persistence"] == []
 
@@ -170,9 +160,7 @@ def test_noise_beyond_the_allowance_would_be_a_finding(workspace, smoke_result):
 
 
 def test_quiet_rules_are_not_flagged_noisy(smoke_result):
-    lsass = next(
-        r for r in smoke_result.run.results if r.case.rule_name == "lsass_memory_access"
-    )
+    lsass = next(r for r in smoke_result.run.results if r.case.rule_name == "lsass_memory_access")
     assert not lsass.is_noisy
 
 
@@ -199,9 +187,7 @@ def test_quick_smoke_gates_pass(smoke_result):
 
 def test_summary_arithmetic_is_consistent(smoke_result):
     summary = smoke_result.run.summarise()
-    scoreable = sum(
-        summary.by_outcome.get(o, 0) for o in ("detected", "visible", "blind")
-    )
+    scoreable = sum(summary.by_outcome.get(o, 0) for o in ("detected", "visible", "blind"))
     assert summary.total == sum(summary.by_outcome.values())
     assert summary.detection_rate == pytest.approx(
         summary.by_outcome.get("detected", 0) / scoreable
@@ -284,9 +270,7 @@ def test_documented_detection_gap_reports_visible(workspace):
     result = pipeline.run(
         workspace.profiles.require("ransomware-precursor"), compare=False, operator="pytest"
     )
-    rdp = next(
-        r for r in result.run.results if r.case.rule_name == "rdp_logon_from_workstation"
-    )
+    rdp = next(r for r in result.run.results if r.case.rule_name == "rdp_logon_from_workstation")
     # Telemetry arrived; the over-broad exclusion swallowed it.
     assert rdp.outcome is Outcome.VISIBLE
     assert rdp.status is CaseStatus.PASS

@@ -308,9 +308,10 @@ def test_proof_outweighs_polish():
         "validation": GOOD["validation"],
     }
     scoring = ScoringContext(outcomes={"terse": Outcome.DETECTED})
-    assert score_rule(Rule.from_dict(terse), scoring).total > score_rule(
-        Rule.from_dict(documented), ScoringContext()
-    ).total
+    assert (
+        score_rule(Rule.from_dict(terse), scoring).total
+        > score_rule(Rule.from_dict(documented), ScoringContext()).total
+    )
 
 
 def test_a_blind_outcome_hurts_more_than_a_visible_one():
@@ -322,9 +323,7 @@ def test_a_blind_outcome_hurts_more_than_a_visible_one():
 
 def test_noise_is_penalised():
     quiet = ScoringContext(outcomes={"good_rule": Outcome.DETECTED})
-    noisy = ScoringContext(
-        outcomes={"good_rule": Outcome.DETECTED}, noisy=frozenset({"good_rule"})
-    )
+    noisy = ScoringContext(outcomes={"good_rule": Outcome.DETECTED}, noisy=frozenset({"good_rule"}))
     rule = Rule.from_dict(GOOD)
     assert score_rule(rule, noisy).total < score_rule(rule, quiet).total
 

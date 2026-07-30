@@ -212,9 +212,7 @@ def test_navigator_marks_excluded_techniques_disabled(sample_run):
 
 
 def test_write_reports_produces_every_format(tmp_path, sample_run, sample_coverage):
-    written = write_reports(
-        sample_run, tmp_path, formats=FORMATS, coverage=sample_coverage
-    )
+    written = write_reports(sample_run, tmp_path, formats=FORMATS, coverage=sample_coverage)
     assert {p.name for p in written} == {
         "report.json",
         "report.md",

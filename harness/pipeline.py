@@ -174,9 +174,7 @@ class Pipeline:
         )
         return cases
 
-    def _build_case(
-        self, run_id: str, rule: Rule, test_id: str, backend: str
-    ) -> ValidationCase:
+    def _build_case(self, run_id: str, rule: Rule, test_id: str, backend: str) -> ValidationCase:
         skip: str | None = None
         if not rule.validation.enabled:
             skip = "validation is disabled for this rule"
@@ -353,9 +351,7 @@ class Pipeline:
         if compare:
             diff = self._compare(record)
 
-        gates = evaluate_gates(
-            record, gates_config, diff=diff, coverage=coverage, noise=noise
-        )
+        gates = evaluate_gates(record, gates_config, diff=diff, coverage=coverage, noise=noise)
 
         return PipelineResult(
             run=record,

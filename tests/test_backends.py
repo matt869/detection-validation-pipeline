@@ -134,9 +134,7 @@ def test_baseline_and_emulation_windows_do_not_overlap(backend):
     now = utcnow()
     backend.set_anchors({"test-a": now}, baseline=now - timedelta(hours=1))
     emulation_window = TimeWindow(now - timedelta(minutes=2), now + timedelta(minutes=5))
-    assert (
-        backend.search(match_all(), emulation_window, attribution=BASELINE_TEST_ID).count == 0
-    )
+    assert backend.search(match_all(), emulation_window, attribution=BASELINE_TEST_ID).count == 0
 
 
 # ------------------------------------------------------------------ results

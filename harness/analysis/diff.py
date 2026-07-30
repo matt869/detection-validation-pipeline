@@ -178,9 +178,8 @@ def _compare(previous: CaseResult, current: CaseResult) -> DeltaKind:
         current.outcome is Outcome.DETECTED
         and previous.latency_seconds
         and current.latency_seconds
-        and current.latency_seconds > max(
-            previous.latency_seconds * _SLOWDOWN_FACTOR, _SLOWDOWN_FLOOR_SECONDS
-        )
+        and current.latency_seconds
+        > max(previous.latency_seconds * _SLOWDOWN_FACTOR, _SLOWDOWN_FLOOR_SECONDS)
     ):
         return DeltaKind.SLOWER
 
@@ -194,9 +193,7 @@ def _delta(
 ) -> CaseDelta:
     note = ""
     if kind is DeltaKind.REGRESSION and current.outcome is Outcome.BLIND:
-        note = (
-            "telemetry stopped arriving; check collection before touching the rule"
-        )
+        note = "telemetry stopped arriving; check collection before touching the rule"
     elif kind is DeltaKind.REGRESSION and current.outcome is Outcome.VISIBLE:
         note = "telemetry still arrives but the rule no longer matches it"
     elif kind is DeltaKind.NEW:

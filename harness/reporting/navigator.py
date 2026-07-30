@@ -98,7 +98,11 @@ def build_layer(
 
     return {
         "name": name or f"Validated coverage - {run.profile}",
-        "versions": {"attack": coverage.attack_version or "16", "navigator": "4.9.1", "layer": "4.5"},
+        "versions": {
+            "attack": coverage.attack_version or "16",
+            "navigator": "4.9.1",
+            "layer": "4.5",
+        },
         "domain": domain,
         "description": (
             f"Measured detection coverage from run {run.run_id} "
@@ -106,7 +110,9 @@ def build_layer(
             "Score is the fraction of validation cases for the technique that "
             "actually fired - not the number of rules that exist for it."
         ),
-        "filters": {"platforms": sorted({r.case.platform.title() for r in run.results if r.case.platform})},
+        "filters": {
+            "platforms": sorted({r.case.platform.title() for r in run.results if r.case.platform})
+        },
         "sorting": 0,
         "layout": {
             "layout": "side",
@@ -148,7 +154,6 @@ def _comment(technique: Any) -> str:
         parts.append(f"missing telemetry: {', '.join(technique.missing_telemetry)}")
     if not technique.meets_detection_target and technique.scoreable:
         parts.append(
-            f"below target ({technique.detection_rate:.0%} vs "
-            f"{technique.target_detected:.0%})"
+            f"below target ({technique.detection_rate:.0%} vs {technique.target_detected:.0%})"
         )
     return " | ".join(parts)

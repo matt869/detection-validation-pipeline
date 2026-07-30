@@ -96,9 +96,7 @@ class EmulationRunner:
         if not enabled and mode == "local":
             log.warning("execution requested but not permitted: %s", why)
 
-        log.info(
-            "emulating %d test(s) in %s mode against %s", len(ordered), mode, self.target.host
-        )
+        log.info("emulating %d test(s) in %s mode against %s", len(ordered), mode, self.target.host)
 
         for index, test_id in enumerate(ordered):
             test = self.catalog.get(test_id)
