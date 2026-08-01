@@ -47,6 +47,11 @@ class TelemetrySource:
     onboarding: str = ""
     #: backend kind -> {"scope": <selector>, "table": <optional table>}
     backends: dict[str, dict[str, Any]] = field(default_factory=dict)
+    #: Liveness expectations: ``{"interval": "15m", "grace": 3}``. Optional,
+    #: because most sources are continuous and the default suits them. Set it
+    #: where the source arrives in clumps - CloudTrail batches, hourly exports -
+    #: or `dvp heartbeat` will call a healthy pipeline silent.
+    heartbeat: dict[str, Any] = field(default_factory=dict)
 
     def scope(self, backend_kind: str) -> Any:
         """Selector for this source in a given dialect, or ``None`` if unmapped."""
@@ -74,6 +79,7 @@ class TelemetrySource:
             "owner": self.owner,
             "onboarding": self.onboarding,
             "backends": dict(self.backends),
+            "heartbeat": dict(self.heartbeat),
         }
 
     @classmethod
@@ -92,6 +98,7 @@ class TelemetrySource:
             owner=str(data.get("owner") or ""),
             onboarding=str(data.get("onboarding") or ""),
             backends={str(k): dict(v or {}) for k, v in backends.items()},
+            heartbeat=dict(data.get("heartbeat") or {}),
         )
 
 

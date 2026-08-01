@@ -37,6 +37,7 @@ examples:
   dvp run --profile quick-smoke          offline validation against fixtures
   dvp run --profile credential-theft --backend splunk --execute
   dvp coverage --navigator layer.json    export measured coverage to Navigator
+  dvp heartbeat --source sysmon_process_creation   which hosts stopped sending
   dvp report --latest --format html
 """
 
@@ -101,6 +102,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_rules(sub)
     _add_tests(sub)
     _add_coverage(sub)
+    _add_heartbeat(sub)
     _add_report(sub)
     _add_runs(sub)
     _add_db(sub)
@@ -698,6 +700,167 @@ def _cmd_tests_show(args: argparse.Namespace) -> int:
             )
         )
     return ExitCode.OK
+
+
+# --------------------------------------------------------------- heartbeat
+
+
+def _add_heartbeat(sub) -> None:
+    parser = sub.add_parser(
+        "heartbeat",
+        help="per-host telemetry liveness for a log source",
+        description=(
+            "Answers the question validation cannot: has a host stopped sending, "
+            "between runs? Exits 1 if any host is silent, so it can run from cron."
+        ),
+    )
+    parser.add_argument(
+        "--source",
+        dest="sources",
+        action="append",
+        help="telemetry source id (repeatable; default: every source the corpora carry)",
+    )
+    parser.add_argument("--interval", help="expected gap between events (default: 15m)")
+    parser.add_argument(
+        "--grace",
+        type=float,
+        default=None,
+        help="intervals overdue before a host is called silent (default: 3)",
+    )
+    parser.add_argument(
+        "--as-of",
+        help="evaluate as at this time (default: the newest recorded event)",
+    )
+    parser.add_argument(
+        "--inventory",
+        type=Path,
+        help="file of expected host names, one per line - lets the report name a host "
+        "that never onboarded, which no amount of log data can reveal on its own",
+    )
+    parser.add_argument("--all", action="store_true", help="list live hosts too, not just gaps")
+    parser.add_argument("--json", action="store_true")
+    parser.set_defaults(handler=_cmd_heartbeat)
+
+
+def _cmd_heartbeat(args: argparse.Namespace) -> int:
+    from harness.analysis.heartbeat import (
+        DEFAULT_GRACE,
+        DEFAULT_INTERVAL_SECONDS,
+        build_heartbeat,
+        format_age,
+        observe_corpora,
+        parse_interval,
+    )
+    from harness.backends.fixture import FixtureBackend
+    from harness.core.timeutil import parse_ts, utcnow
+    from harness.pipeline import Workspace
+
+    workspace = Workspace.load(args.root)
+    backend = FixtureBackend(workspace.settings.backend("fixture"), root=workspace.settings.root)
+    backend.load()
+    corpora = backend.corpora
+
+    wanted = args.sources or [
+        source.id for source in workspace.telemetry if source.scope("fixture")
+    ]
+    unknown = [s for s in wanted if s not in workspace.telemetry]
+    if unknown:
+        raise UsageError(
+            f"unknown telemetry source(s): {', '.join(unknown)}",
+            hint="Ids come from mapping/telemetry_sources.yml; `dvp doctor` lists them.",
+        )
+
+    interval = parse_interval(args.interval, DEFAULT_INTERVAL_SECONDS)
+    grace = args.grace if args.grace is not None else DEFAULT_GRACE
+    # Only from a file the operator supplies. Inferring which hosts *should*
+    # send a source - from a naming convention, or from the fact that a host
+    # sent some other source - manufactures gaps that are artefacts of the
+    # inference. A host that never onboarded is real, and knowing about it
+    # needs an inventory, not a guess.
+    inventory = _read_inventory(args.inventory) if args.inventory else ()
+
+    reports = []
+    for source_id in wanted:
+        source = workspace.telemetry.require(source_id)
+        scope = source.scope("fixture")
+        if not isinstance(scope, dict):
+            continue
+        observations = observe_corpora(corpora, scope)
+        # As-of defaults to the end of the recording rather than to now. The
+        # corpora are months old; measuring their age against the wall clock
+        # would report every host as silent and say nothing about any estate.
+        if args.as_of:
+            as_of = parse_ts(args.as_of) or utcnow()
+        elif observations:
+            as_of = max(o.at for o in observations)
+        else:
+            as_of = utcnow()
+
+        reports.append(
+            (
+                source_id,
+                build_heartbeat(
+                    observations,
+                    source=source_id,
+                    as_of=as_of,
+                    interval_seconds=parse_interval(
+                        (source.heartbeat or {}).get("interval"), interval
+                    ),
+                    grace=float((source.heartbeat or {}).get("grace", grace)),
+                    expected_hosts=inventory,
+                ),
+            )
+        )
+
+    if args.json:
+        print(
+            json.dumps(
+                {source_id: report.to_dict() for source_id, report in reports},
+                indent=2,
+            )
+        )
+    else:
+        for source_id, report in reports:
+            rows = report.beats if args.all else report.silent() + report.late()
+            if not rows:
+                print(f"{dim(source_id):48}  {len(report.alive())} host(s) alive")
+                continue
+            print(bold(source_id))
+            print(
+                dim(
+                    f"  as of {report.as_of.isoformat().replace('+00:00', 'Z')}  "
+                    f"interval {format_age(rows[0].interval_seconds)}"
+                )
+            )
+            _print_table(
+                ["state", "host", "last seen", "events"],
+                [
+                    (
+                        b.state,
+                        b.host,
+                        "never" if b.never_seen else f"{format_age(b.age_seconds)} ago",
+                        str(b.events),
+                    )
+                    for b in rows
+                ],
+            )
+            print()
+
+    silent = sum(len(report.silent()) for _, report in reports)
+    if silent:
+        print(f"{silent} host/source pair(s) silent")
+        return ExitCode.GATE_FAILED
+    print("every expected host is reporting")
+    return ExitCode.OK
+
+
+def _read_inventory(path: Path) -> tuple[str, ...]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise UsageError(f"could not read inventory {path}: {exc}") from exc
+    hosts = [line.strip().lstrip("- ").strip() for line in lines]
+    return tuple(h for h in hosts if h and not h.startswith("#"))
 
 
 # ---------------------------------------------------------------- coverage

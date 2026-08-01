@@ -10,7 +10,36 @@ version: the **exit codes** in
 to tell "detections regressed" from "the SIEM was down", and the **`report.json`
 schema**, which is what anyone downstream parses.
 
-## [Unreleased]
+## [0.3.0] — 2026-08-01
+
+### Added
+
+- **`dvp heartbeat`** — per-host liveness for a log source, the question
+  validation cannot answer. A run only checks whether telemetry arrived *during
+  a test window*; a forwarder that dies at 02:00 on a Tuesday stays invisible
+  until the next scheduled run, and usually surfaces as a detection that did
+  not fire during an incident. Three states: `alive` within the expected
+  interval, `late` while overdue but inside the grace multiplier, `silent`
+  past it. Only `silent` exits non-zero, because paging on the first missed
+  interval is how a liveness alert gets muted. Sources may declare their own
+  cadence with a `heartbeat:` block — set on `aws_cloudtrail_management`, whose
+  batched delivery the 15m default would report as dead every night.
+- Hosts are reported because they sent something, or because an operator named
+  them via `--inventory`. The first implementation inferred which hosts *should*
+  send a source from the naming convention and immediately invented a gap on a
+  host that sends Sysmon but produced no process-creation events in a scenario
+  snippet. Inference deleted, in a tool whose compilers already refuse rather
+  than approximate.
+- Corpora now carry `recorded_at` through to the loader, so anything asking a
+  question about elapsed time knows when offset zero actually was. A corpus
+  without it is skipped rather than anchored to a guess.
+- A **"What the numbers mean"** section in the README. `scoreable` is
+  `detected + visible + blind`; errors and skips are excluded; **blind counts
+  against the detection rate**. That last one is a deliberate choice — a
+  control you cannot see is not a control you have, and excusing it rewards
+  estates for not collecting — but it was only discoverable by reading
+  `models.py`, and a percentage gets screenshotted out of context far more
+  often than code gets read.
 
 ### Changed
 

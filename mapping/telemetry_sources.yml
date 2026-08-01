@@ -13,6 +13,19 @@
 #
 # `fixture` scopes are field/value mappings evaluated with normal Sigma
 # selection semantics against the offline event corpus.
+#
+# An optional `heartbeat:` block declares how often a source is expected to
+# arrive from a given host, which is what `dvp heartbeat` measures liveness
+# against:
+#
+#   heartbeat:
+#     interval: 15m   # a longer gap than this means overdue
+#     grace: 3        # overdue by this many intervals means silent
+#
+# Set it wherever a source arrives in clumps rather than continuously -
+# CloudTrail batches, hourly exports, a scanner that runs nightly. Left unset,
+# the 15m default applies, and a batched source will be reported silent while
+# the pipeline behind it is perfectly healthy.
 
 version: 1
 
@@ -522,6 +535,13 @@ sources:
       fixture:
         scope:
           source: aws.cloudtrail
+    # CloudTrail batches: delivery to S3 is documented as "typically within 15
+    # minutes", and quiet accounts genuinely produce nothing for stretches. The
+    # 15m default would report a healthy trail silent overnight, which is how
+    # the one source nobody can reconstruct after the fact gets muted.
+    heartbeat:
+      interval: 30m
+      grace: 4
 
   aws_guardduty_findings:
     name: AWS GuardDuty - Findings

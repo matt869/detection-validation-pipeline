@@ -104,6 +104,7 @@ $ dvp rules score --explain       # per-rule quality grades
 $ dvp run --profile quick-smoke --plan-only
 $ dvp coverage --gaps visibility  # what is not being logged
 $ dvp coverage --navigator layer.json
+$ dvp heartbeat                   # which hosts stopped sending, between runs
 $ dvp runs diff                   # what changed since last time
 $ dvp report --latest --format html
 $ dvp dashboard                   # local read-only review UI
@@ -111,6 +112,63 @@ $ dvp dashboard                   # local read-only review UI
 
 Exit codes are stable, so CI can tell "detections regressed" (1) from "the SIEM
 was unreachable" (5). See [`docs/architecture.md`](docs/architecture.md#exit-codes).
+
+## What the numbers mean
+
+Metric definitions get misread far more often than code does, so here they are
+explicitly. Every rate has the same denominator, **scoreable cases** — cases
+that produced a verdict. A case that errored or was skipped is excluded
+entirely: a backend timeout is not evidence about a detection, in either
+direction.
+
+| | |
+| --- | --- |
+| scoreable | `detected + visible + blind` |
+| **detection rate** | `detected / scoreable` |
+| **telemetry visibility** | `(detected + visible) / scoreable` |
+
+**Blind cases count against the detection rate.** A rule that could not fire
+because its log source is missing is not scored as neutral and is not excused —
+it lowers the number exactly as a rule that fired and missed would. That is
+deliberate: a control you cannot see is not a control you have, and the
+alternative rewards estates for not collecting. It also means the detection
+rate alone is ambiguous, which is why visibility is always reported beside it.
+19 of 21 at 90% with 95% visibility says "one rule is wrong and one log source
+is missing", and no single percentage can say that.
+
+Gates are a separate question from rates. A gap that is documented, owned and
+dated does not fail a build, while the rate still reports it — see
+[`docs/three-state-model.md`](docs/three-state-model.md).
+
+## Heartbeat
+
+Validation only asks "did the telemetry arrive" while a run is happening. A
+forwarder that dies at 02:00 on a Tuesday is invisible until the next scheduled
+run, and usually the first anyone hears of it is a detection that did not fire
+during an incident.
+
+```console
+$ dvp heartbeat --source sysmon_process_creation
+```
+
+```
+sysmon_process_creation
+  as of 2026-05-14T11:20:03Z  interval 15m
+STATE   HOST         LAST SEEN  EVENTS
+silent  SRV-LAB-DC1  77m ago    1
+
+1 host/source pair(s) silent
+```
+
+Three states, and the middle one is the point: `alive` within the expected
+interval, `late` while overdue but inside the grace multiplier, `silent` past
+it. Endpoints reboot and laptops close — paging on the first missed interval is
+how a liveness alert gets muted, so only `silent` exits non-zero.
+
+It reports hosts it has heard from, plus whatever inventory you hand it with
+`--inventory`. It will not guess which hosts *ought* to be sending a source
+from a naming convention: a host that never onboarded is real and worth
+naming, but inferring it manufactures gaps that are artefacts of the inference.
 
 ## Rules
 

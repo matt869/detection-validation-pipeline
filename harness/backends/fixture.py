@@ -74,16 +74,23 @@ class FixtureCorpus:
     description: str = ""
     tests: tuple[str, ...] = ()
     events: list[FixtureEvent] = field(default_factory=list)
+    #: When the recording was taken. Validation does not need this - it anchors
+    #: events to the emulation that just ran - but anything asking a question
+    #: about elapsed time, such as the telemetry heartbeat, needs to know when
+    #: "offset 0" actually was.
+    recorded_at: datetime | None = None
 
     @classmethod
     def load(cls, directory: Path) -> FixtureCorpus:
         manifest_path = directory / "manifest.yml"
         manifest = load_yaml(manifest_path, default={}) if manifest_path.exists() else {}
+        recorded = manifest.get("recorded_at")
         corpus = cls(
             name=str(manifest.get("scenario") or directory.name),
             path=directory,
             description=str(manifest.get("description") or ""),
             tests=tuple(str(t) for t in (manifest.get("tests") or [])),
+            recorded_at=parse_ts(recorded) if recorded else None,
         )
 
         for events_file in sorted(directory.glob("*.jsonl")):
