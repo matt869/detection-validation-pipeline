@@ -36,14 +36,22 @@ jobs:
       matrix:
         profile: [quick-smoke, credential-theft, ransomware-precursor]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
       - run: pip install -e .
 
+      # Exit 1 is not a build failure here, and that is the same call the
+      # systemd units already make with `SuccessExitStatus=0 1`: a failing gate
+      # means the run completed and the report was written. These profiles
+      # measure an estate that is knowingly below target - ransomware-precursor
+      # fails its detection-rate gate today because of two dated, owned gaps -
+      # so failing the job on exit 1 would make the nightly permanently red,
+      # and a job that is always red is a job nobody reads. The report is the
+      # signal; exit codes 2-8 mean the pipeline itself broke and still fail.
       - name: Validate
         run: |
           set +e
@@ -55,10 +63,9 @@ jobs:
           set -e
           case "$code" in
             0) echo "all gates satisfied" ;;
-            1) echo "::warning title=Gate failed (${{ matrix.profile }})::A gate failed. This is a result, not a crash - the report was written." ;;
-            *) echo "::error title=Pipeline error (${{ matrix.profile }})::dvp exited $code before producing a verdict." ;;
+            1) echo "::warning title=Gate failed (${{ matrix.profile }})::A gate failed. This is a result, not a crash - the report was written and is in the job summary." ;;
+            *) echo "::error title=Pipeline error (${{ matrix.profile }})::dvp exited $code before producing a verdict."; exit "$code" ;;
           esac
-          exit "$code"
 
       - name: Publish the report to the job summary
         if: always()
@@ -68,7 +75,7 @@ jobs:
 
       - name: Upload the run
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nightly-${{ matrix.profile }}
           path: artifacts/

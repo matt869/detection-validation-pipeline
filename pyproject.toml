@@ -70,6 +70,12 @@ packages = [
 minversion = "8.0"
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+# Several test modules import shared builders via `from tests.conftest import`,
+# which needs the repository root importable. `python -m pytest` puts it there
+# and a bare `pytest` does not, so without this the suite passes or fails
+# depending on how it was invoked - which is exactly how it reached CI green
+# locally and red on the runner.
+pythonpath = ["."]
 markers = [
   "slow: tests that take more than a second",
   "live: tests that require a reachable SIEM backend (deselected by default)",

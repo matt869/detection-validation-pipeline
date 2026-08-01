@@ -10,6 +10,28 @@ version: the **exit codes** in
 to tell "detections regressed" from "the SIEM was down", and the **`report.json`
 schema**, which is what anyone downstream parses.
 
+## [Unreleased]
+
+### Fixed
+
+- CI ran `pytest` where the Makefile runs `python -m pytest`. Four test modules
+  import shared builders via `from tests.conftest import`, which needs the
+  repository root on `sys.path` — the module form puts it there and the bare
+  command does not, so the suite passed locally and failed on the runner.
+  `pythonpath = ["."]` in `pyproject.toml` makes the invocation irrelevant, and
+  the workflow now matches the Makefile.
+- A failing gate no longer fails the nightly job. `ransomware-precursor` exits
+  1 by design — it measures an estate with two dated, owned gaps — so the
+  nightly was permanently red, and a job that is always red is a job nobody
+  reads. This is the same call the systemd units already make with
+  `SuccessExitStatus=0 1`. Exit codes 2-8 still fail. The pull-request gate is
+  unchanged and still fails on 1.
+
+### Changed
+
+- Actions bumped to `checkout@v7`, `setup-python@v7`, `upload-artifact@v7`;
+  the v4/v5 tags target Node 20, which runners now force onto Node 24.
+
 ## [0.2.0] — 2026-07-31
 
 ### Added

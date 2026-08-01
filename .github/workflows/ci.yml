@@ -34,9 +34,9 @@ jobs:
     name: detection content
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
@@ -68,9 +68,9 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -84,17 +84,21 @@ jobs:
       - name: Type-check
         run: mypy harness rulekit
 
+      # `python -m pytest`, not bare `pytest`: the suite imports shared builders
+      # from tests.conftest, and only the module form puts the repository root on
+      # sys.path. pyproject sets `pythonpath` so both work, and this matches the
+      # Makefile so there is one command, not two that can diverge.
       - name: Test
-        run: pytest -q
+        run: python -m pytest -q
 
   validate:
     name: offline validation
     runs-on: ubuntu-latest
     needs: [content]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
@@ -136,7 +140,7 @@ jobs:
 
       - name: Upload the run
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: validation-run
           path: artifacts/
