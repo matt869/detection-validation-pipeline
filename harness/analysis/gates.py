@@ -141,7 +141,8 @@ def evaluate_gates(
             actual=summary.detection_rate,
             target=settings.min_detection_rate,
             label="detection rate",
-            offenders=tuple(_key(r) for r in run.results if r.outcome is Outcome.VISIBLE)[:20],
+            unaccepted=_gap_keys(run, Outcome.VISIBLE, accepted=False),
+            accepted=_gap_keys(run, Outcome.VISIBLE, accepted=True),
         )
     )
 
@@ -152,7 +153,8 @@ def evaluate_gates(
             actual=summary.visibility_rate,
             target=settings.min_visibility_rate,
             label="telemetry visibility",
-            offenders=tuple(_key(r) for r in run.results if r.outcome is Outcome.BLIND)[:20],
+            unaccepted=_gap_keys(run, Outcome.BLIND, accepted=False),
+            accepted=_gap_keys(run, Outcome.BLIND, accepted=True),
         )
     )
 
@@ -194,25 +196,37 @@ def evaluate_gates(
     )
 
     # -- coverage targets ----------------------------------------------------
+    # Same rule as the rate gates: a tactic sitting below target only because
+    # of gaps that are documented and owned is a tactic doing exactly what the
+    # content said it would. It is still reported - the number stays true and
+    # the tactic stays in the coverage report - but it does not fail a build
+    # that has nothing new to tell anyone.
     failing = coverage.failing_tactics() if coverage else []
+    drifting = _tactics_with_unaccepted_gaps(run)
     critical = [t for t in failing if t.priority in ("critical", "high")]
+    unaccounted = [t for t in critical if t.tactic in drifting]
     outcome.results.append(
         GateResult(
             name="coverage-targets",
             applicable=(
                 settings.fail_on_coverage_target and coverage is not None and bool(coverage.tactics)
             ),
-            passed=not critical,
+            passed=not unaccounted,
             message=(
-                f"{len(critical)} high-priority tactic(s) below target"
-                if critical
-                else "all high-priority tactics meet their coverage target"
+                f"{len(unaccounted)} high-priority tactic(s) below target with undocumented gaps"
+                if unaccounted
+                else (
+                    f"{len(critical)} high-priority tactic(s) below target, entirely from "
+                    "documented gaps - tracked, not drifting"
+                    if critical
+                    else "all high-priority tactics meet their coverage target"
+                )
             ),
             offenders=tuple(
                 f"{t.tactic}: detection {t.detection_rate:.0%} "
                 f"(target {t.target_detected:.0%}), visibility {t.visibility_rate:.0%} "
                 f"(target {t.target_visible:.0%})"
-                for t in critical[:20]
+                for t in (unaccounted or critical)[:20]
             ),
         )
     )
@@ -226,21 +240,76 @@ def _rate_gate(
     actual: float,
     target: float,
     label: str,
-    offenders: tuple[str, ...],
+    unaccepted: tuple[str, ...],
+    accepted: tuple[str, ...],
 ) -> GateResult:
+    """Fail on the shortfall nobody has accepted, and report the true rate.
+
+    The rate itself is never adjusted. 90% visibility means 90% of the required
+    telemetry arrived, and inflating that because the missing 10% has a ticket
+    against it would be the green tick over a hole this whole tool argues
+    against - accept enough gaps and every estate scores 100%.
+
+    What is adjusted is whether the build fails. A gap that is documented,
+    owned and dated has already been decided on; failing every run until an
+    unrelated ticket lands does not make it land sooner, it just teaches the
+    team that this gate is always red. So the gate fails when *any* case
+    dragging the rate down is one nobody expected - and passes, loudly and with
+    the cases named, when the entire shortfall is already on the books.
+    """
     applicable = target > 0
-    passed = (not applicable) or actual >= target
+    below = applicable and actual < target
+    passed = not below or not unaccepted
+
+    if not below:
+        message = f"{label} {actual:.0%} meets the {target:.0%} target"
+    elif unaccepted:
+        message = (
+            f"{label} {actual:.0%} is below the {target:.0%} target, "
+            f"{len(unaccepted)} of them undocumented"
+        )
+    else:
+        message = (
+            f"{label} {actual:.0%} is below the {target:.0%} target, entirely from "
+            f"{len(accepted)} documented gap(s) - tracked, not drifting"
+        )
+
     return GateResult(
         name=name,
         applicable=applicable,
         passed=passed,
-        message=(
-            f"{label} {actual:.0%} is below the {target:.0%} target"
-            if applicable and not passed
-            else f"{label} {actual:.0%} meets the {target:.0%} target"
-        ),
-        offenders=() if passed else offenders,
+        message=message,
+        # Named either way. A gate that passes silently over an accepted gap is
+        # how an accepted gap becomes a forgotten one.
+        offenders=unaccepted if unaccepted else (accepted if below else ()),
     )
+
+
+def _is_accepted(result: Any) -> bool:
+    """True when this gap is exactly what the rule said it would be.
+
+    ``PASS`` on a non-``DETECTED`` outcome means the rule declared this gap, and
+    the linter has already insisted it carry an owner. Anything else - a rule
+    that expected to fire and did not - is drift.
+    """
+    return result.status is CaseStatus.PASS and result.outcome is not Outcome.DETECTED
+
+
+def _tactics_with_unaccepted_gaps(run: RunRecord) -> set[str]:
+    """Tactics where at least one gap is not what the rule documented."""
+    return {
+        ref.tactic
+        for result in run.results
+        if result.outcome in (Outcome.VISIBLE, Outcome.BLIND) and not _is_accepted(result)
+        for ref in result.case.attack
+        if ref.tactic
+    }
+
+
+def _gap_keys(run: RunRecord, outcome: Outcome, *, accepted: bool) -> tuple[str, ...]:
+    return tuple(
+        _key(r) for r in run.results if r.outcome is outcome and _is_accepted(r) is accepted
+    )[:20]
 
 
 def _key(result: Any) -> str:

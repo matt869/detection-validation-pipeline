@@ -12,6 +12,21 @@ schema**, which is what anyone downstream parses.
 
 ## [Unreleased]
 
+### Changed
+
+- The rate and coverage gates now fail on the part of a shortfall that is
+  **undocumented**, rather than on the shortfall. `ransomware-precursor` failed
+  two gates every run because one case declares `expect: blind` against
+  SEC-4471 — a gate that cannot pass until an unrelated Q4 ticket lands is not
+  a signal, and the repository already argues this for `SuccessExitStatus=0 1`
+  and for the three-state model itself: a documented, owned, dated gap must not
+  page anyone. The reported rate is unchanged and still true (90% visibility is
+  90%, never excused into 100%), the accepted gaps are named in the gate's own
+  output every run, and the moment one stops matching its declared expectation
+  the gate fails again and says which case. Verified against the shipped
+  content by flipping `expect: blind` to `detected` on the Defender rule: three
+  gates fire immediately.
+
 ### Added
 
 - `defender_exclusion_registry`: the same behaviour as

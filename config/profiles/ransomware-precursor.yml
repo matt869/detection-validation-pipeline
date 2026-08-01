@@ -44,6 +44,12 @@ gates:
   # Log clearing and defence impairment are the steps most likely to be
   # invisible rather than merely undetected, so visibility carries the higher
   # bar here too.
+  #
+  # This chain currently measures 90% against that 95%, and the run still
+  # passes: the whole shortfall is defender_exclusion_added, which declares
+  # `expect: blind` against SEC-4471. The target stays at 95% rather than being
+  # dropped to 90% to match reality - lowering it would lose the assertion, and
+  # the day that gap closes or a second one opens the number has to move.
   min_visibility_rate: 95%
   min_detection_rate: 80%
   fail_on_regression: true

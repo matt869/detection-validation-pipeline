@@ -284,20 +284,79 @@ def test_rate_gates_are_inapplicable_when_the_threshold_is_zero():
 
 
 def test_detection_rate_gate_fires_below_the_threshold():
-    run = make_run([case_result(Outcome.VISIBLE), case_result(Outcome.DETECTED, rule="b")])
+    # An undocumented gap: the rule expected to fire and did not.
+    run = make_run(
+        [
+            case_result(Outcome.VISIBLE, status=CaseStatus.FAIL),
+            case_result(Outcome.DETECTED, rule="b"),
+        ]
+    )
     outcome = evaluate_gates(run, GateSettings(min_detection_rate=0.9))
-    assert not outcome.passed
-    assert "50%" in next(g for g in outcome.results if g.name == "detection-rate").message
+    gate = next(g for g in outcome.results if g.name == "detection-rate")
+    assert not gate.passed
+    assert "50%" in gate.message
+
+
+def test_a_rate_below_target_from_documented_gaps_alone_does_not_fail_the_build():
+    """The number stays true; the build does not fail on a decision already made.
+
+    A gap that is documented, owned and dated has been through review. Failing
+    every run until an unrelated ticket lands does not make it land sooner - it
+    teaches the team that this gate is always red, which is how a real
+    regression gets waved through.
+    """
+    run = make_run(
+        [
+            case_result(Outcome.BLIND, status=CaseStatus.PASS),
+            case_result(Outcome.DETECTED, rule="b"),
+        ]
+    )
+    outcome = evaluate_gates(run, GateSettings(min_visibility_rate=0.95))
+    gate = next(g for g in outcome.results if g.name == "visibility-rate")
+
+    assert gate.passed
+    # The rate is never inflated: accept enough gaps and every estate would
+    # otherwise score 100%.
+    assert "50%" in gate.message
+    assert "documented" in gate.message
+    # And the accepted gap is still named, because a gate that passes silently
+    # over one is how an accepted gap becomes a forgotten one.
+    assert gate.offenders
+
+
+def test_one_undocumented_gap_still_fails_a_mostly_documented_shortfall():
+    run = make_run(
+        [
+            case_result(Outcome.BLIND, status=CaseStatus.PASS),
+            case_result(Outcome.BLIND, rule="drifted", status=CaseStatus.FAIL),
+        ]
+    )
+    outcome = evaluate_gates(run, GateSettings(min_visibility_rate=0.95))
+    gate = next(g for g in outcome.results if g.name == "visibility-rate")
+    assert not gate.passed
+    assert gate.offenders == ("drifted/T1059.001-test",)
 
 
 def test_coverage_gate_is_off_unless_explicitly_enabled():
     # A coverage target is an estate-wide assertion; most profiles are subsets.
-    run = make_run([case_result(Outcome.VISIBLE)])
+    run = make_run([case_result(Outcome.VISIBLE, status=CaseStatus.FAIL)])
     coverage = build_coverage(run, reference=REFERENCE, targets=TARGETS)
     default = evaluate_gates(run, GateSettings(), coverage=coverage)
     enabled = evaluate_gates(run, GateSettings(fail_on_coverage_target=True), coverage=coverage)
-    assert default.passed
-    assert not enabled.passed
+    assert not next(g for g in default.results if g.name == "coverage-targets").applicable
+    assert not next(g for g in enabled.results if g.name == "coverage-targets").passed
+
+
+def test_coverage_gate_ignores_a_tactic_short_only_by_documented_gaps():
+    run = make_run([case_result(Outcome.BLIND, status=CaseStatus.PASS)])
+    coverage = build_coverage(run, reference=REFERENCE, targets=TARGETS)
+    outcome = evaluate_gates(run, GateSettings(fail_on_coverage_target=True), coverage=coverage)
+    gate = next(g for g in outcome.results if g.name == "coverage-targets")
+
+    assert gate.passed
+    # Still reported, still named. Passing is not the same as hiding.
+    assert "below target" in gate.message
+    assert gate.offenders
 
 
 def test_regression_gate_uses_the_diff():

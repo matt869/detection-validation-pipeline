@@ -126,6 +126,26 @@ counts against the technique's coverage target, so it stays visible in the
 coverage report until it is actually closed. Those are two different questions
 and the pipeline answers both.
 
+There is a third question underneath them: **should this fail a build?** The
+rate and coverage gates report the true number — a run with one uncollected log
+source shows 90% visibility and says so, because a rate that excused its own
+gaps would let an estate reach 100% by accepting everything. But they fail only
+when some part of the shortfall is *undocumented*. A gap that is owned and
+dated has already been through review; failing every run until an unrelated
+ticket lands does not make it land sooner, it teaches the team that the gate is
+always red, and that is how a real regression gets waved through. So the gate
+says:
+
+```
+pass  visibility-rate  telemetry visibility 90% is below the 95% target,
+                       entirely from 1 documented gap(s) - tracked, not drifting
+```
+
+and names the gap every time. The moment one of those gaps stops matching its
+declared expectation — the rule was edited, the log source came back, a
+different source died — the same gate fails and names the case responsible.
+Passing is not the same as hiding.
+
 ## Noise is a fourth, orthogonal question
 
 Before any emulation runs, every rule's detection logic is also run over a
