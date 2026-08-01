@@ -12,8 +12,34 @@ schema**, which is what anyone downstream parses.
 
 ## [Unreleased]
 
+### Added
+
+- `defender_exclusion_registry`: the same behaviour as
+  `defender_exclusion_added`, read through the sensor this estate actually
+  collects. SEC-4471 leaves the Defender event channel unforwarded, but
+  `infra/sysmon/sysmon-config.xml` has always included the Defender exclusions
+  key in its RegistryEvent group — the telemetry was being collected and
+  nothing was reading it. Both rules share one emulation test, so a single run
+  now reports `blind` for the channel that is missing and `detected` for the
+  sensor that is deployed, side by side. The corpus gains the Sysmon EventID 13
+  write the recording had omitted; note it carries `MsMpEng.exe`, not
+  `powershell.exe`, because `Add-MpPreference` has the Defender service make
+  the change — so the registry rule detects the exclusion but cannot attribute
+  it without correlating process creation.
+- `ransomware-precursor` now meets its detection-rate gate (80%, was 78%). Its
+  visibility-rate gate still fails, correctly: a compensating control is not a
+  closure, and `defender_exclusion_added` stays `expect: blind` until SEC-4471
+  lands.
+
 ### Fixed
 
+- A technique with one blind case and one detected case vanished from
+  `dvp coverage --gaps visibility`. The listing keyed on the technique's
+  summary status, which only says `visibility-gap` when *every* case is blind,
+  so adding a compensating rule deleted the uncollected log source from the
+  report — a green tick over a hole, which is the failure this project exists
+  to prevent. Gap listings now key on the case counts. Two existing CLI tests
+  caught it the moment the second rule landed.
 - CI ran `pytest` where the Makefile runs `python -m pytest`. Four test modules
   import shared builders via `from tests.conftest import`, which needs the
   repository root on `sys.path` — the module form puts it there and the bare

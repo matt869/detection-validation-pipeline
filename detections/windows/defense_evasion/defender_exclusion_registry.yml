@@ -1,0 +1,103 @@
+id: 3a7c1e58-64bd-4f02-9a13-c8e5d20b7f91
+name: defender_exclusion_registry
+title: Microsoft Defender exclusion written to the registry
+status: production
+severity: high
+description: >-
+  A value was written under the Defender exclusions key outside managed policy.
+  This is the same behaviour as defender_exclusion_added, seen through a
+  different sensor: rather than the Defender event log, it watches the registry
+  write that adding an exclusion produces. Adding an exclusion and then staging
+  a payload inside it is a standard preparatory step, so the excluded path is
+  the first thing to check against files created on the host afterwards.
+author: detection-engineering
+date: 2026-08-01
+modified: 2026-08-01
+references:
+  - https://attack.mitre.org/techniques/T1562/001/
+
+attack:
+  tactics: [defense-evasion]
+  techniques: [T1562.001]
+
+platforms: [windows]
+
+logsource:
+  product: windows
+  service: sysmon
+  category: registry_set
+
+# The reason this rule exists. Microsoft-Windows-Windows Defender/Operational
+# is not forwarded in this estate (SEC-4471), so defender_exclusion_added
+# reports BLIND and will keep reporting BLIND until onboarding lands. Sysmon
+# registry monitoring *is* deployed, and infra/sysmon/sysmon-config.xml already
+# includes `\Windows Defender\Exclusions\` in its RegistryEvent group - the
+# telemetry was being collected and nothing was reading it.
+telemetry:
+  - sysmon_registry_set
+
+detection:
+  selection_exclusion_key:
+    EventID: 13
+    TargetObject|contains: '\Windows Defender\Exclusions\'
+
+  # Exclusions pushed by Intune or GPO land under the Policies hive and are
+  # managed centrally, so they are reviewed elsewhere. Same boundary as
+  # defender_exclusion_added draws on NewValue - keeping the two rules aligned
+  # matters, because a path excluded here and alerted there is worse than
+  # either choice made consistently.
+  filter_managed_policy:
+    TargetObject|contains: '\Policies\Microsoft\Windows Defender\Exclusions\'
+
+  condition: selection_exclusion_key and not filter_managed_policy
+
+fields:
+  - Computer
+  - TargetObject
+  - Details
+  - Image
+  - User
+  - UtcTime
+
+falsepositives:
+  - >-
+    Application vendors whose installers add their own exclusions. Each one
+    should be converted into a managed policy exclusion rather than allowlisted
+    here, so that the local-write path stays alertable.
+  - >-
+    Defender platform updates rewrite values under the exclusions key during
+    servicing. These carry the same MsMpEng.exe image as a genuine change and
+    cannot be told apart on this event alone; correlate with the process
+    creation that preceded them, or accept the volume - it is a handful of
+    events per platform release.
+
+validation:
+  emulation:
+    - T1562.001-defender-path-exclusion
+  # The same emulation test as defender_exclusion_added, deliberately. One
+  # behaviour, two telemetry paths, two rules: the pipeline reports BLIND for
+  # the rule whose log source is missing and DETECTED for the one whose sensor
+  # is deployed, in the same run. That contrast is the argument for the
+  # three-state model in one line of output.
+  expect: detected
+  owner: detection-engineering
+  max_latency: 5m
+
+tuning:
+  baseline_profile: windows-workstation
+  expected_daily_volume: 2
+  notes:
+    - >-
+      This rule cannot attribute the exclusion on its own. Add-MpPreference
+      asks the Defender service to make the change, so Sysmon records the write
+      as MsMpEng.exe running as SYSTEM - the requesting process does not appear
+      on this event. Pivot to sysmon_process_creation in the surrounding window
+      to find who asked; the corpus records that process event too.
+    - >-
+      Keep this rule when SEC-4471 lands. Two sensors covering one behaviour is
+      the point: the registry write survives the Defender event channel being
+      disabled, which is itself something an attacker may do first.
+
+tags:
+  - purple-team
+  - defence-in-depth

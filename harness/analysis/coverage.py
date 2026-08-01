@@ -298,10 +298,27 @@ class CoverageReport:
         )
 
     def gaps(self, kind: str) -> list[TechniqueCoverage]:
-        """``kind`` is ``detection`` or ``visibility``."""
-        wanted = "detection-gap" if kind == "detection" else "visibility-gap"
+        """Techniques with at least one case in that gap state.
+
+        ``kind`` is ``detection`` or ``visibility``.
+
+        Deliberately keyed on the case counts rather than on ``status``, which
+        collapses a technique to one word and only says ``visibility-gap`` when
+        *every* case is blind. One technique can be covered by two rules
+        reading two sensors: T1562.001 is detected through the Sysmon registry
+        write and blind on the Defender channel that is not forwarded. Selecting
+        on ``status`` would drop it from this list the moment the compensating
+        rule was added - deleting an uncollected log source from the report
+        because something else happened to catch the behaviour, which is the
+        green tick over a hole this tool exists to prevent. A gap covered from
+        another angle is still a gap.
+        """
+        if kind == "detection":
+            selected = (t for t in self.techniques.values() if t.visible)
+        else:
+            selected = (t for t in self.techniques.values() if t.blind)
         return sorted(
-            (t for t in self.techniques.values() if t.status == wanted),
+            selected,
             key=lambda t: (_PRIORITY_ORDER.get(t.priority, 9), t.technique),
         )
 

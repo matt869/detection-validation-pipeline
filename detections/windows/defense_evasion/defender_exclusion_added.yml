@@ -75,6 +75,14 @@ tuning:
       Once SEC-4471 lands, change `expect` to `detected` and remove the
       justification. The pipeline will then report a FAIL if the source
       regresses, which is the point of the exercise.
+    - >-
+      The behaviour is covered in the meantime by defender_exclusion_registry,
+      which reads the Sysmon registry write instead of the Defender channel.
+      That is a compensating control, not a closure: it detects the change but
+      cannot see Defender's own view of it, and it attributes the write to
+      MsMpEng.exe rather than to the process that asked. SEC-4471 stays open,
+      and this rule stays `expect: blind` until it lands - a gap covered from
+      another angle is still a gap.
 
 tags:
   - purple-team

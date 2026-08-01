@@ -81,6 +81,44 @@ def test_blind_technique_names_the_missing_source():
     assert technique.missing_telemetry == ("windows_defender_operational",)
 
 
+def test_a_compensating_rule_does_not_delete_the_visibility_gap():
+    """One sensor covering for another must not erase the uncollected source.
+
+    T1562.001 in the shipped content is exactly this: detected through the
+    Sysmon registry write, blind on the Defender channel nobody forwards. If
+    the gap listing keyed on the technique's summary status, adding the
+    compensating rule would drop the missing log source out of the report - a
+    green tick over a hole, which is the failure this whole project is against.
+    """
+    run = make_run(
+        [
+            case_result(Outcome.DETECTED, rule="via_sysmon", telemetry=["sysmon_registry_set"]),
+            case_result(
+                Outcome.BLIND, rule="via_defender", telemetry=["windows_defender_operational"]
+            ),
+        ]
+    )
+    coverage = build_coverage(run, reference=REFERENCE, targets=TARGETS)
+
+    gaps = coverage.gaps("visibility")
+    assert [t.technique for t in gaps] == ["T1059.001"]
+    assert gaps[0].missing_telemetry == ("windows_defender_operational",)
+    # The summary word is still "partial" - one word cannot describe both
+    # halves, which is precisely why the listing does not depend on it.
+    assert coverage.techniques["T1059.001"].status == "partial"
+
+
+def test_detection_gaps_list_every_technique_with_a_silent_rule():
+    run = make_run(
+        [
+            case_result(Outcome.DETECTED, rule="works"),
+            case_result(Outcome.VISIBLE, rule="silent"),
+        ]
+    )
+    coverage = build_coverage(run, reference=REFERENCE, targets=TARGETS)
+    assert [t.technique for t in coverage.gaps("detection")] == ["T1059.001"]
+
+
 def test_operational_outcomes_do_not_distort_rates():
     run = make_run(
         [

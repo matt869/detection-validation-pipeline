@@ -35,16 +35,17 @@ $ dvp run --profile quick-smoke
   [+] detected  lsass_memory_access / T1003.001-lsass-handle-open 9.0s
   [+] detected  powershell_encoded_command / T1059.001-powershell-encoded 2.0s
   [x] blind     defender_exclusion_added / T1562.001-defender-path-exclusion
+  [+] detected  defender_exclusion_registry / T1562.001-defender-path-exclusion 4.0s
   [!] visible   rdp_logon_from_workstation / T1021.001-rdp-interactive-logon
   [+] detected  run_key_persistence / T1547.001-run-key-appdata 4.0s  noisy(1)
   ...
 
-  detected   18  ######################..  the control works
+  detected   19  ######################..  the control works
   visible     1  #.......................  telemetry present, rule silent - detection gap
   blind       1  #.......................  no telemetry - visibility gap
 
   detection rate      90%   telemetry visibility    95%
-  detect latency    p50 3.0s   p95 5m 16s
+  detect latency    p50 3.0s   p95 5m 11s
   noisy rules       2 rule(s) also match quiet-baseline activity
 
   pass  no-errors            no cases errored
@@ -53,6 +54,15 @@ $ dvp run --profile quick-smoke
 
 PASS  all gates satisfied
 ```
+
+Those two lines for `T1562.001` are the whole argument in one place: **one
+behaviour, two sensors, two answers.** `defender_exclusion_added` reads the
+Defender event channel, which this estate does not forward, so it is `blind`.
+`defender_exclusion_registry` reads the Sysmon registry write that the same
+action produces, which *is* collected, so it is `detected`. A pass/fail tool
+would show one red and one green and leave you to work out why. This says the
+rule is fine and the log source is missing — and it keeps saying it until
+someone onboards the channel.
 
 Neither gap is a failure, and that is the point. `defender_exclusion_added`
 declares `expect: blind` because the Defender channel is not onboarded yet.

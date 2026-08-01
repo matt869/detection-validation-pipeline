@@ -1,10 +1,13 @@
 scenario: execution-evasion
 description: >-
   Execution and defence-evasion behaviours on a lab workstation. Note what is
-  *absent*: the Defender exclusion test produced a Sysmon process event but no
-  Microsoft-Windows-Windows Defender/Operational record, because that channel is
-  not forwarded in this estate. That absence is the point - it is what makes
-  defender_exclusion_added resolve to BLIND rather than to a detection failure.
+  *absent*: the Defender exclusion test produced a Sysmon process event and the
+  Sysmon registry write, but no Microsoft-Windows-Windows Defender/Operational
+  record, because that channel is not forwarded in this estate. That absence is
+  the point - it is what makes defender_exclusion_added resolve to BLIND rather
+  than to a detection failure, while defender_exclusion_registry detects the
+  same behaviour through the sensor that is deployed. One test, two rules, two
+  outcomes, in the same run.
 recorded_at: "2026-05-14T10:03:00Z"
 recorded_from: WKS-LAB-014
 sensor: Sysmon 15.15, PowerShell script block logging enabled
