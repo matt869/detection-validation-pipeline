@@ -76,14 +76,22 @@ as an error, for exactly this reason.
 
 ## Recording your own
 
-Run against a live backend, then capture what it returned:
+Capture what a live backend returned, while the run is executing:
 
 ```console
-$ dvp run --profile credential-theft --backend splunk --execute
+$ dvp run --profile credential-theft --backend splunk --execute --record lab-2026-08
 ```
 
-`FixtureBackend.record()` converts absolute timestamps to offsets. Before
-committing a corpus:
+Each declared telemetry source is queried over each emulation window using the
+same selector that scoped the rule, so the corpus holds exactly the slice the
+telemetry probe measured. Absolute timestamps become offsets from the moment
+the behaviour started; the baseline window is captured too, tagged
+`__baseline__`. An event the platform returned without a usable timestamp is
+dropped rather than written at offset 0 — that would invent a detection at the
+instant the test began.
+
+The manifest is written with `origin: recorded` and `review_required: true`.
+Before committing a corpus:
 
 - **Redact.** Recorded events come from real hosts. Check usernames, hostnames,
   IP addresses and command lines. The examples here use RFC 5737 addresses and

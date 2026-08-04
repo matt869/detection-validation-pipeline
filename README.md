@@ -102,6 +102,8 @@ $ dvp rules lint                  # pre-commit hook material
 $ dvp rules compile lsass_memory_access --dialect splunk
 $ dvp rules score --explain       # per-rule quality grades
 $ dvp run --profile quick-smoke --plan-only
+$ dvp run -p quick-smoke -b splunk --execute --record lab-2026-08
+                                  # capture the live run as a replayable corpus
 $ dvp coverage --gaps visibility  # what is not being logged
 $ dvp coverage --navigator layer.json
 $ dvp heartbeat                   # which hosts stopped sending, between runs
@@ -139,6 +141,32 @@ is missing", and no single percentage can say that.
 Gates are a separate question from rates. A gap that is documented, owned and
 dated does not fail a build, while the rate still reports it — see
 [`docs/three-state-model.md`](docs/three-state-model.md).
+
+## Recording a live run
+
+The offline corpora are what make this runnable in CI forever. Producing one by
+hand means writing JSONL with the right `_test` / `_offset` / `_host`
+attribution, which nobody does twice — so the moment a range is torn down, the
+evidence it produced is gone.
+
+```console
+$ dvp run --profile quick-smoke --backend splunk --execute --record lab-2026-08
+```
+
+While the run executes, each declared telemetry source is asked what it saw
+during each emulation window, and the answer is written to
+`fixtures/runs/lab-2026-08/` — using the same selector that scoped the rule and
+compiled its telemetry probe, so a corpus can never hold a different slice of
+the platform than the probe measured. The baseline window is captured too;
+without it a replay cannot measure whether a rule fires on quiet-period
+activity, and every rule would look cleaner than it is.
+
+**What comes back is real estate data** — hostnames, usernames, command lines,
+and occasionally a credential that should never have been on a command line.
+Redaction (`reporting.redact_fields`) runs before anything reaches the disk, and
+the manifest is marked `review_required: true`. Read it before you commit it.
+Everything already committed under `fixtures/runs/` is synthetic, and a test
+enforces that.
 
 ## Heartbeat
 

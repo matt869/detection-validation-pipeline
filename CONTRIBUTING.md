@@ -36,9 +36,15 @@ prove it matches, and can tell you why on the day it stops.
    payloads — see [SECURITY.md](SECURITY.md).
 
 5. **Record a corpus** under `fixtures/runs/<scenario>/` so the rule can be
-   validated with no lab and no credentials. Events are synthetic; invent the
-   hosts and users. This is what makes the rule testable in CI forever, and it
-   is the step most likely to be skipped and most likely to be regretted.
+   validated with no lab and no credentials. This is what makes the rule
+   testable in CI forever, and it is the step most likely to be skipped and
+   most likely to be regretted.
+
+   Write it by hand with invented hosts and users, or capture it from a real
+   run with `dvp run --backend <live> --execute --record <name>`. A capture is
+   real estate data: redaction runs first and the manifest is marked
+   `review_required`, but reading it before it is committed is your job. Only
+   synthetic corpora belong in this repository.
 
 6. **Set `validation.expect:`** honestly:
 

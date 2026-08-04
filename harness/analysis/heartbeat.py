@@ -42,6 +42,7 @@ __all__ = [
     "HeartbeatReport",
     "Observation",
     "build_heartbeat",
+    "host_of",
     "matches_scope",
 ]
 
@@ -173,7 +174,7 @@ def observe_corpora(corpora: Iterable[Any], scope: Mapping[str, Any]) -> list[Ob
         for event in corpus.events:
             if not matches_scope(event.document, scope):
                 continue
-            host = _host_of(event.document)
+            host = host_of(event.document)
             if not host:
                 continue
             observations.append(
@@ -192,13 +193,15 @@ def hosts_in_corpora(corpora: Iterable[Any]) -> list[str]:
     hosts: set[str] = set()
     for corpus in corpora:
         for event in corpus.events:
-            host = _host_of(event.document)
+            host = host_of(event.document)
             if host:
                 hosts.add(host)
     return sorted(hosts)
 
 
-def _host_of(document: Mapping[str, Any]) -> str:
+def host_of(document: Mapping[str, Any]) -> str:
+    """Which field names the host. One definition, shared with the recorder, so
+    a corpus is tagged with the same host the heartbeat later looks for."""
     for key in ("_host", "Computer", "host", "hostname"):
         value = document.get(key)
         if value:

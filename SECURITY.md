@@ -45,7 +45,14 @@ own authority.
 
 Recorded corpora under [`fixtures/runs/`](fixtures/runs/) are synthetic. Host
 names, users, and addresses in them are invented; none of it came from a real
-estate.
+estate, and a test in the suite fails if a corpus marked `origin: recorded` is
+ever committed alongside them.
+
+`dvp run --record` produces the other kind. What a live platform returns is real
+data about a real estate, so the recorder redacts the configured fields before
+writing and marks the manifest `review_required: true` — but the review is a
+person's job, not the tool's. Read a recording before committing it, and treat
+publishing one to a public repository as the disclosure decision it is.
 
 ## Running it safely
 

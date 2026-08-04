@@ -141,6 +141,17 @@ def _add_run(sub) -> None:
         help="report format (repeatable): json, markdown, html, junit, navigator",
     )
     parser.add_argument("--output", "-o", type=Path, help="report output directory")
+    parser.add_argument(
+        "--record",
+        metavar="NAME",
+        help="capture what the platform saw into fixtures/runs/NAME, so this run "
+        "replays offline forever (live backends only)",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="allow --record to replace an existing corpus",
+    )
     parser.add_argument("--no-store", action="store_true", help="do not write to the database")
     parser.add_argument("--no-report", action="store_true", help="skip writing report files")
     parser.add_argument(
@@ -177,6 +188,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
         compare=not args.no_compare,
         operator=_operator(),
         git_ref=_git_ref(workspace.settings.root),
+        record_as=args.record,
+        overwrite_recording=args.overwrite,
     )
 
     if result.plan_only:
@@ -196,6 +209,16 @@ def _cmd_run(args: argparse.Namespace) -> int:
         noise=result.noise,
         verbose=args.verbose,
     )
+
+    if result.recorded:
+        print()
+        print(bold(f"Recorded {result.recorded}"))
+        print(
+            dim(
+                "  Real telemetry. Review it before committing - hostnames, users and "
+                "command lines are in there, and the manifest is marked review_required."
+            )
+        )
 
     if not args.no_store:
         _store_result(workspace, result)

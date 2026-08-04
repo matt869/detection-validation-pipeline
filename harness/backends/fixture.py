@@ -302,35 +302,3 @@ class FixtureBackend(Backend):
         return self._anchors.get(test_id)
 
     # -- authoring aid -----------------------------------------------------
-
-    def record(
-        self,
-        scenario: str,
-        test_id: str,
-        events: Iterable[Mapping[str, Any]],
-        *,
-        anchor: datetime,
-        host: str = "lab-host",
-    ) -> Path:
-        """Append live events to a corpus, converting timestamps to offsets.
-
-        Used by ``dvp fixtures record`` to capture a real run so it can be
-        replayed offline afterwards.
-        """
-        directory = self.root / scenario
-        directory.mkdir(parents=True, exist_ok=True)
-        target = directory / "events.jsonl"
-        anchor = to_utc(anchor)
-
-        with target.open("a", encoding="utf-8") as handle:
-            for document in events:
-                stamp = parse_ts(document.get("_time") or document.get("@timestamp"))
-                offset = (to_utc(stamp) - anchor).total_seconds() if stamp else 0.0
-                payload = {
-                    _TEST_KEY: test_id,
-                    _OFFSET_KEY: round(offset, 3),
-                    _HOST_KEY: host,
-                    **{k: v for k, v in document.items() if k != "_time"},
-                }
-                handle.write(json.dumps(payload, sort_keys=False, default=str) + "\n")
-        return target

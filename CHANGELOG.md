@@ -10,6 +10,39 @@ version: the **exit codes** in
 to tell "detections regressed" from "the SIEM was down", and the **`report.json`
 schema**, which is what anyone downstream parses.
 
+## [0.4.0] — 2026-08-04
+
+### Added
+
+- **`dvp run --record NAME`** — capture a live run as a replayable corpus.
+  Producing one by hand meant writing JSONL with the right `_test` / `_offset` /
+  `_host` attribution, which nobody does twice, so the evidence a range produced
+  died with the range. Each declared telemetry source is now queried over each
+  emulation window using the same selector that scoped the rule and compiled its
+  probe — one definition, so a corpus cannot hold a different slice of the
+  platform than the probe measured. The baseline window is captured too;
+  without it a replay cannot measure quiet-period noise and every rule looks
+  cleaner than it is.
+- The recorder refuses rather than approximates, in the three places it could
+  have guessed: an event with no usable timestamp is dropped instead of written
+  at offset 0 (which would invent a detection at the instant the test began), a
+  source with no selector for the dialect is reported instead of silently
+  omitted (a replay would otherwise report BLIND and blame the estate for a hole
+  in the recording), and an existing corpus is never overwritten without
+  `--overwrite`, because a corpus is evidence with a date on it.
+- Recordings are real estate data. Redaction runs before anything reaches the
+  disk, the manifest carries `origin: recorded` and `review_required: true`, and
+  a test fails if a corpus marked that way is ever committed beside the
+  synthetic ones. `SECURITY.md` and `CONTRIBUTING.md` say so too.
+
+### Removed
+
+- `FixtureBackend.record()`, dead since it was written: nothing called it, its
+  docstring referred to a `dvp fixtures record` command that never existed, and
+  it anchored timestamp-less events to offset 0 — the exact bug the replacement
+  refuses to commit. `fixtures/README.md` documented it; it now documents the
+  command that exists.
+
 ## [0.3.0] — 2026-08-01
 
 ### Added

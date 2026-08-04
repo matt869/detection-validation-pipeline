@@ -40,7 +40,7 @@ from harness.analysis.gates import GateOutcome, evaluate_gates
 from harness.backends import BASELINE_TEST_ID, Backend, FixtureBackend, build_backend
 from harness.backends.base import QueryResult
 from harness.core.config import Settings, load_settings
-from harness.core.errors import CompileError, ConfigError, DvpError
+from harness.core.errors import CompileError, ConfigError, DvpError, UsageError
 from harness.core.ids import new_case_id, new_run_id
 from harness.core.logging import get_logger
 from harness.core.models import (
@@ -109,6 +109,8 @@ class PipelineResult:
     noise: list[NoiseFinding] = field(default_factory=list)
     emulation: EmulationOutcome | None = None
     plan_only: bool = False
+    #: Where a corpus was recorded, when ``record=`` was asked for.
+    recorded: Path | None = None
 
     @property
     def passed(self) -> bool:
@@ -211,6 +213,8 @@ class Pipeline:
         compare: bool = True,
         operator: str = "unknown",
         git_ref: str | None = None,
+        record_as: str | None = None,
+        overwrite_recording: bool = False,
     ) -> PipelineResult:
         settings = self.settings
         timing = profile.timing(settings.timing)
@@ -261,6 +265,8 @@ class Pipeline:
                 execute=execute,
                 host=host,
                 compare=compare,
+                record_as=record_as,
+                overwrite_recording=overwrite_recording,
             )
         finally:
             backend.close()
@@ -279,6 +285,8 @@ class Pipeline:
         execute: bool,
         host: str | None,
         compare: bool,
+        record_as: str | None = None,
+        overwrite_recording: bool = False,
     ) -> PipelineResult:
         settings = self.settings
         compiler = self._compiler(backend)
@@ -331,6 +339,23 @@ class Pipeline:
         record.results = results
         record.finished_at = utcnow()
 
+        # -- capture ----------------------------------------------------------
+        # After collection, so a recording never changes what was measured, and
+        # before scoring, so a failure to write is reported next to the run it
+        # belongs to rather than after the verdict.
+        recorded: Path | None = None
+        if record_as:
+            recorded = self._record(
+                name=record_as,
+                backend=backend,
+                cases=cases,
+                emulation=emulation,
+                baseline_window=baseline_window,
+                profile=profile,
+                run_id=record.run_id,
+                overwrite=overwrite_recording,
+            )
+
         # -- stage 7: score ---------------------------------------------------
         coverage = build_coverage(
             record,
@@ -360,6 +385,51 @@ class Pipeline:
             diff=diff,
             noise=noise,
             emulation=emulation,
+            recorded=recorded,
+        )
+
+    def _record(
+        self,
+        *,
+        name: str,
+        backend: Backend,
+        cases: Sequence[ValidationCase],
+        emulation: EmulationOutcome,
+        baseline_window: TimeWindow,
+        profile: Profile,
+        run_id: str,
+        overwrite: bool,
+    ) -> Path | None:
+        """Capture what the platform saw, as a corpus that replays offline."""
+        from harness.recorder import capture, sources_for, windows_for, write_corpus
+
+        if isinstance(backend, FixtureBackend):
+            # Recording a replay would copy a corpus and call it evidence.
+            raise UsageError(
+                "--record needs a live backend; the fixture backend is already a recording",
+                hint="Run against the platform you want evidence from: "
+                "dvp run --profile quick-smoke --backend splunk --record <name>",
+            )
+
+        rule_names = {c.rule_name for c in cases}
+        rules = [r for r in self.workspace.rules if r.name in rule_names]
+        corpus = capture(
+            backend,
+            sources_for(rules, self.workspace.telemetry),
+            windows_for(emulation, baseline=baseline_window),
+            name=name,
+            redact_fields=self.settings.reporting.redact_fields,
+        )
+        for problem in corpus.errors:
+            log.warning("recording: %s", problem)
+
+        return write_corpus(
+            corpus,
+            self.settings.layout.fixtures / "runs" / name,
+            recorded_from=emulation.target,
+            profile=profile.name,
+            run_id=run_id,
+            overwrite=overwrite,
         )
 
     def _collect(
