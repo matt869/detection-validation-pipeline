@@ -18,12 +18,16 @@ Three things this deliberately does not do:
   an event, so an event inside two overlapping windows belongs to the earlier
   one and nothing pretends otherwise - which is also why the harness paces
   tests apart with ``inter_test_delay``.
-* **Trust itself with your data.** Recorded telemetry is real estate data:
+* **Claim your data is safe.** Recorded telemetry is real estate data:
   hostnames, usernames, command lines, sometimes credentials that should not
-  have been on a command line in the first place. Redaction runs before
-  anything reaches the disk, and the manifest marks the corpus as needing
-  review before it is committed. A recorder that quietly published production
-  logs to a public repository would be a worse bug than any detection gap.
+  have been on a command line in the first place. ``redact_fields`` runs before
+  anything reaches the disk, but it matches field *names* - a password inside a
+  ``CommandLine`` value survives it, and inferring which substring of a command
+  line is a credential is exactly the approximation this codebase refuses. So
+  the manifest records what was redacted, names the fields whose values were
+  not inspected, and marks the corpus ``review_required``. A recorder that
+  quietly published production logs to a public repository would be a worse bug
+  than any detection gap this tool reports.
 * **Overwrite.** A corpus is evidence with a date on it. Recording over one
   destroys the run it documented, so an existing directory is an error unless
   the caller explicitly asked to replace it.
@@ -64,10 +68,27 @@ log = get_logger("recorder")
 #: reads.
 BASELINE_TEST_ID = "__baseline__"
 
-#: Per source, per window. High enough to capture a noisy source's real volume,
-#: low enough that a misconfigured query cannot pull a day of an index into a
-#: git repository.
+#: Per source, across the whole capture span. High enough for a noisy source's
+#: real volume, low enough that a misconfigured query cannot pull a day of an
+#: index into a git repository.
 DEFAULT_LIMIT = 2000
+
+#: Fields whose *values* routinely carry secrets even though their names never
+#: match a redaction term. ``redact_fields`` matches field names, so a password
+#: passed on a command line survives it - the recording is flagged instead, and
+#: a human decides. Guessing which part of a command line is a credential is
+#: exactly the approximation this codebase refuses everywhere else.
+VALUE_RISK_FIELDS = (
+    "CommandLine",
+    "ParentCommandLine",
+    "ProcessCommandLine",
+    "ScriptBlockText",
+    "CommandLineArguments",
+    "cmdline",
+    "args",
+    "Details",
+    "requestParameters",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +113,10 @@ class RecordedCorpus:
     hosts: set[str] = field(default_factory=set)
     recorded_at: datetime | None = None
     errors: list[str] = field(default_factory=list)
+    #: Fields present in the recording whose values commonly carry secrets that
+    #: name-based redaction cannot remove. Surfaced so a reviewer knows where
+    #: to look rather than being told the data is clean.
+    value_risk_fields: set[str] = field(default_factory=set)
 
     def __len__(self) -> int:
         return len(self.events)
@@ -145,32 +170,52 @@ def capture(
             "these sources are absent from the corpus and will replay as BLIND"
         )
 
-    for capture_window in windows:
-        for source, query in queries:
-            if query is None:
+    # One query per source across the whole span, not one per source per window.
+    # Twenty tests and thirteen sources is 273 searches the other way, which on
+    # a real search head takes longer than the run it is recording - and an
+    # event inside two overlapping windows comes back from both queries and is
+    # written twice, turning one detection into two on replay. Query once,
+    # attribute in Python, where it is testable and an event lands in exactly
+    # one place.
+    span = _span(windows)
+    if span is None:
+        corpus.errors.append("no usable capture windows - nothing was recorded")
+        return corpus
+
+    ordered = sorted(windows, key=lambda w: to_utc(w.window.start))
+    for source, query in queries:
+        if query is None:
+            continue
+        result = backend.search(query, span, limit=limit)
+        if not result.ok:
+            corpus.errors.append(f"{source.id}: {result.error}")
+            continue
+        if result.truncated:
+            corpus.errors.append(
+                f"{source.id}: hit the {limit} event cap; the recording is incomplete "
+                "and a replay will under-report volume"
+            )
+
+        for event in result.events:
+            capture_window = _window_for(event, ordered)
+            if capture_window is None:
+                # Outside every window: this event belongs to no test, and
+                # inventing an attribution would credit a detection to
+                # behaviour that did not produce it.
                 continue
-            result = backend.search(query, capture_window.window, limit=limit)
-            if not result.ok:
-                corpus.errors.append(f"{source.id} during {capture_window.test_id}: {result.error}")
+            document = _document(event, capture_window, redact_fields)
+            if document is None:
                 continue
-            if result.truncated:
-                corpus.errors.append(
-                    f"{source.id} during {capture_window.test_id}: hit the {limit} event "
-                    "cap; the recording is incomplete and a replay will under-report volume"
-                )
+            corpus.events.append(document)
+            host = document.get("_host")
+            if host:
+                corpus.hosts.add(str(host))
+            corpus.value_risk_fields.update(f for f in VALUE_RISK_FIELDS if document.get(f))
 
-            for event in result.events:
-                document = _document(event, capture_window, redact_fields)
-                if document is None:
-                    continue
-                corpus.events.append(document)
-                host = document.get("_host")
-                if host:
-                    corpus.hosts.add(str(host))
+        if source.id not in corpus.sources:
+            corpus.sources.append(source.id)
 
-            if source.id not in corpus.sources:
-                corpus.sources.append(source.id)
-
+    for capture_window in ordered:
         if (
             capture_window.test_id != BASELINE_TEST_ID
             and capture_window.test_id not in corpus.tests
@@ -181,6 +226,33 @@ def capture(
     # every capture produces a diff nobody can review.
     corpus.events.sort(key=lambda d: (str(d.get("_test")), float(d.get("_offset", 0))))
     return corpus
+
+
+def _span(windows: Sequence[CaptureWindow]) -> TimeWindow | None:
+    """One window covering every capture window, for a single query per source."""
+    if not windows:
+        return None
+    starts = [to_utc(w.window.start) for w in windows]
+    ends = [to_utc(w.window.end) for w in windows]
+    return TimeWindow(start=min(starts), end=max(ends))
+
+
+def _window_for(event: Event, ordered: Sequence[CaptureWindow]) -> CaptureWindow | None:
+    """The capture window an event belongs to, or ``None`` if it belongs to none.
+
+    Earliest start wins where windows overlap. A live platform carries no marker
+    saying which test caused an event, so overlapping windows are genuinely
+    ambiguous - the harness paces tests apart with ``inter_test_delay`` for this
+    reason. Picking one deterministically beats writing the event twice.
+    """
+    timestamp = event.timestamp
+    if timestamp is None:
+        return None
+    moment = to_utc(timestamp)
+    for capture_window in ordered:
+        if to_utc(capture_window.window.start) <= moment <= to_utc(capture_window.window.end):
+            return capture_window
+    return None
 
 
 def _document(
@@ -220,6 +292,7 @@ def write_corpus(
     sensor: str = "",
     profile: str = "",
     run_id: str = "",
+    redacted_fields: Sequence[str] = (),
     overwrite: bool = False,
 ) -> Path:
     """Write the corpus to ``directory`` as ``manifest.yml`` + ``events.jsonl``."""
@@ -236,6 +309,16 @@ def write_corpus(
             "as a visibility gap in the estate rather than an empty recording.",
         )
 
+    if corpus.value_risk_fields:
+        # Not an error and not blocked: the fields are legitimate telemetry and
+        # usually exactly what makes a corpus worth having. But "redaction ran"
+        # must not be read as "this is safe to publish".
+        log.warning(
+            "recording contains %s - name-based redaction does not inspect values; "
+            "read these before committing",
+            ", ".join(sorted(corpus.value_risk_fields)),
+        )
+
     directory.mkdir(parents=True, exist_ok=True)
     manifest = {
         "scenario": corpus.name,
@@ -249,6 +332,10 @@ def write_corpus(
         # this is a decision a person has to make.
         "origin": "recorded",
         "review_required": True,
+        #: What redaction actually did, and what it could not do. A reviewer
+        #: should not have to read the source to find out.
+        "redacted_field_names": sorted(redacted_fields),
+        "unredacted_value_risk_fields": sorted(corpus.value_risk_fields),
         "run_id": run_id,
         "tests": list(corpus.tests),
     }

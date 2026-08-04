@@ -49,10 +49,14 @@ estate, and a test in the suite fails if a corpus marked `origin: recorded` is
 ever committed alongside them.
 
 `dvp run --record` produces the other kind. What a live platform returns is real
-data about a real estate, so the recorder redacts the configured fields before
-writing and marks the manifest `review_required: true` — but the review is a
-person's job, not the tool's. Read a recording before committing it, and treat
-publishing one to a public repository as the disclosure decision it is.
+data about a real estate. The recorder redacts the configured fields before
+writing and marks the manifest `review_required: true`, but **redaction matches
+field names, not values** — a credential inside a `CommandLine` survives it, and
+guessing which substring of a command line is a secret is a guess this project
+will not make on your behalf. The manifest lists both `redacted_field_names` and
+`unredacted_value_risk_fields` so the review has somewhere to start. The review
+itself is a person's job. Treat publishing a recording to a public repository as
+the disclosure decision it is.
 
 ## Running it safely
 

@@ -163,10 +163,16 @@ activity, and every rule would look cleaner than it is.
 
 **What comes back is real estate data** — hostnames, usernames, command lines,
 and occasionally a credential that should never have been on a command line.
-Redaction (`reporting.redact_fields`) runs before anything reaches the disk, and
-the manifest is marked `review_required: true`. Read it before you commit it.
+`reporting.redact_fields` runs before anything reaches the disk, but be precise
+about what that buys: it matches field *names*, so `Password: hunter2` is
+removed and `CommandLine: "psexec -p hunter2"` is **not**. Inferring which
+substring of a command line is a credential is the kind of guess this codebase
+refuses everywhere else, so instead the manifest records what was redacted,
+names the fields whose values nobody inspected, and marks the corpus
+`review_required: true`. Read it before you commit it.
+
 Everything already committed under `fixtures/runs/` is synthetic, and a test
-enforces that.
+fails the build if a corpus marked `origin: recorded` ever lands beside them.
 
 ## Heartbeat
 

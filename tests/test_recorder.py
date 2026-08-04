@@ -56,12 +56,16 @@ class _Result:
 
 
 class _Backend:
-    """Enough of a backend to record from, without a SIEM."""
+    """Enough of a backend to record from, without a SIEM.
+
+    One result per *source*, not per window: the recorder queries each source
+    once across the whole span and attributes locally.
+    """
 
     dialect = "splunk"
 
     def __init__(self, results):
-        self._results = results
+        self._results = list(results)
         self.calls = []
 
     def search(self, query, window, *, limit=None, attribution=None):
@@ -158,10 +162,43 @@ def test_a_truncated_capture_says_so():
 
 
 def test_a_failed_query_is_recorded_and_does_not_abort_the_capture():
+    other = TelemetrySource(id="other", name="Other", backends={"splunk": {"scope": "index=x"}})
     backend = _Backend([_Result([], error="search head unreachable"), _Result([event(3)])])
-    corpus = capture(backend, [SYSMON], [window_at("a"), window_at("b", anchor=START)], name="demo")
+    corpus = capture(backend, [SYSMON, other], [window_at()], name="demo")
     assert any("unreachable" in problem for problem in corpus.errors)
     assert len(corpus.events) == 1
+
+
+def test_each_source_is_queried_once_across_the_whole_span():
+    """Not once per window: that is 273 searches for a 20-test profile."""
+    later = window_at("b-test", anchor=START + timedelta(minutes=30))
+    backend = _Backend([_Result([event(0)])])
+    capture(backend, [SYSMON], [window_at("a-test"), later], name="demo")
+
+    assert len(backend.calls) == 1
+    _, span, _ = backend.calls[0]
+    assert span.start == START
+    assert span.end == later.window.end
+
+
+def test_an_event_in_overlapping_windows_is_written_once():
+    # Live platforms carry no marker saying which test caused an event, so
+    # overlapping windows are ambiguous. Writing it twice would turn one
+    # detection into two on replay; earliest start wins instead.
+    overlapping = window_at("second", anchor=START + timedelta(seconds=1), span=600)
+    backend = _Backend([_Result([event(30)])])
+    corpus = capture(backend, [SYSMON], [window_at("first", span=600), overlapping], name="demo")
+
+    assert len(corpus.events) == 1
+    assert corpus.events[0]["_test"] == "first"
+
+
+def test_an_event_outside_every_window_is_not_attributed():
+    # Crediting it to a test would attribute a detection to behaviour that did
+    # not produce it.
+    backend = _Backend([_Result([event(9999)])])
+    corpus = capture(backend, [SYSMON], [window_at(span=60)], name="demo")
+    assert corpus.events == []
 
 
 def test_no_sources_is_an_error_not_an_empty_corpus():
@@ -170,17 +207,14 @@ def test_no_sources_is_an_error_not_an_empty_corpus():
 
 
 def test_events_are_ordered_by_test_then_offset():
-    backend = _Backend([_Result([event(30), event(2)]), _Result([event(5)])])
-    corpus = capture(
-        backend,
-        [SYSMON],
-        [window_at("b-test"), window_at("a-test")],
-        name="demo",
-    )
+    later = window_at("b-test", anchor=START + timedelta(minutes=10), span=600)
+    backend = _Backend([_Result([event(660), event(30), event(2)])])
+    corpus = capture(backend, [SYSMON], [window_at("a-test", span=120), later], name="demo")
+
     assert [(e["_test"], e["_offset"]) for e in corpus.events] == [
-        ("a-test", 5.0),
-        ("b-test", 2.0),
-        ("b-test", 30.0),
+        ("a-test", 2.0),
+        ("a-test", 30.0),
+        ("b-test", 60.0),
     ]
 
 
@@ -189,11 +223,17 @@ def test_events_are_ordered_by_test_then_offset():
 
 def test_written_corpus_is_readable_by_the_replayer(tmp_path):
     """The property the whole feature rests on: what it writes, replay reads."""
-    backend = _Backend([_Result([event(0), event(9)]), _Result([event(4)])])
+    baseline_anchor = START - timedelta(minutes=30)
+    baseline = CaptureWindow(
+        BASELINE_TEST_ID,
+        TimeWindow(start=baseline_anchor, end=baseline_anchor + timedelta(minutes=10)),
+        baseline_anchor,
+    )
+    backend = _Backend([_Result([event(0), event(9), event(-1500)])])
     corpus = capture(
         backend,
         [SYSMON],
-        [window_at("T1059.001-test"), CaptureWindow(BASELINE_TEST_ID, window_at().window, START)],
+        [window_at("T1059.001-test"), baseline],
         name="live-smoke",
     )
     directory = write_corpus(corpus, tmp_path / "live-smoke", recorded_from="WKS-01")
@@ -203,7 +243,29 @@ def test_written_corpus_is_readable_by_the_replayer(tmp_path):
     assert loaded.recorded_at is not None
     assert len(loaded.events) == 3
     assert {e.test_id for e in loaded.events} == {"T1059.001-test", BASELINE_TEST_ID}
-    assert sorted(e.offset_seconds for e in loaded.events) == [0.0, 4.0, 9.0]
+    assert sorted(e.offset_seconds for e in loaded.events) == [0.0, 9.0, 300.0]
+
+
+def test_the_manifest_says_what_redaction_could_not_do(tmp_path):
+    """`redact_fields` matches field names. A secret in a value survives it.
+
+    Claiming otherwise would be the worst kind of wrong: a reviewer who trusts
+    "redaction ran" publishes the command line anyway. The manifest names the
+    fields whose values nobody inspected, so the review has somewhere to start.
+    """
+    import yaml
+
+    backend = _Backend([_Result([event(1, CommandLine="psexec -p Hunter2")])])
+    corpus = capture(backend, [SYSMON], [window_at()], name="demo", redact_fields=["password"])
+
+    # The field name does not match, so the value is still there.
+    assert corpus.events[0]["CommandLine"] == "psexec -p Hunter2"
+    assert corpus.value_risk_fields == {"CommandLine"}
+
+    directory = write_corpus(corpus, tmp_path / "demo", redacted_fields=["password"])
+    manifest = yaml.safe_load((directory / "manifest.yml").read_text(encoding="utf-8"))
+    assert manifest["redacted_field_names"] == ["password"]
+    assert manifest["unredacted_value_risk_fields"] == ["CommandLine"]
 
 
 def test_the_manifest_marks_a_recording_for_review(tmp_path):

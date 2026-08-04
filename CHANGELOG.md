@@ -10,6 +10,38 @@ version: the **exit codes** in
 to tell "detections regressed" from "the SIEM was down", and the **`report.json`
 schema**, which is what anyone downstream parses.
 
+## [0.4.1] — 2026-08-04
+
+Found by running the recorder end to end against a stand-in Splunk rather than
+only against the stub in its unit tests. Three defects, none of which the unit
+tests could have caught, because each one lives in the seam between the pieces.
+
+### Fixed
+
+- **273 searches per run.** The recorder queried each source once per window -
+  thirteen sources across a twenty-test profile - which on a real search head
+  takes longer than the run it is recording. Worse, an event inside two
+  overlapping windows came back from both queries and was written twice, turning
+  one detection into two on replay. It now issues one query per source across
+  the whole span and attributes events locally, where an event lands in exactly
+  one window and the arithmetic is testable. Thirteen searches.
+- **An event outside every window** was previously attributed to whichever
+  window had been queried; it is now dropped. Crediting it to a test would
+  attribute a detection to behaviour that did not produce it.
+- **`redacted_fields` never reached the manifest**, so a recording claimed
+  nothing had been redacted when the defaults had been applied.
+
+### Changed
+
+- The documentation said redaction protects a recording. It matches field
+  *names*: `Password: hunter2` is removed, `CommandLine: "psexec -p hunter2"` is
+  not, and inferring which substring of a command line is a credential is the
+  approximation this codebase refuses everywhere else. The manifest now carries
+  `redacted_field_names` and `unredacted_value_risk_fields`, the recorder warns
+  at write time naming the fields whose values nobody inspected, and README,
+  SECURITY.md, CONTRIBUTING.md and fixtures/README.md say what redaction does
+  instead of implying safety it cannot deliver.
+
 ## [0.4.0] — 2026-08-04
 
 ### Added

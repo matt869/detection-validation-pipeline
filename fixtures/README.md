@@ -90,12 +90,22 @@ the behaviour started; the baseline window is captured too, tagged
 dropped rather than written at offset 0 — that would invent a detection at the
 instant the test began.
 
-The manifest is written with `origin: recorded` and `review_required: true`.
+One query per source across the whole span, not one per source per window: a
+twenty-test profile against thirteen sources would otherwise be 273 searches,
+longer than the run itself, and an event inside two overlapping windows would
+come back twice and be written twice. Attribution happens locally, and earliest
+window wins.
+
+The manifest is written with `origin: recorded`, `review_required: true`, and
+both `redacted_field_names` and `unredacted_value_risk_fields` — redaction
+matches field names, so a secret inside a `CommandLine` value is still there.
 Before committing a corpus:
 
-- **Redact.** Recorded events come from real hosts. Check usernames, hostnames,
-  IP addresses and command lines. The examples here use RFC 5737 addresses and
-  `example`/`lab.example` names.
+- **Redact.** Recorded events come from real hosts. `redact_fields` handles the
+  obvious field names; you handle the values, starting with the fields the
+  manifest lists under `unredacted_value_risk_fields`. Check usernames,
+  hostnames, IP addresses and command lines. The examples here use RFC 5737
+  addresses and `example`/`lab.example` names.
 - **Keep it small.** A corpus is evidence that a rule matches, not a packet
   capture. Ten well-chosen events beat ten thousand.
 - **Include the near-misses.** The credential-theft corpus contains a legitimate

@@ -429,6 +429,7 @@ class Pipeline:
             recorded_from=emulation.target,
             profile=profile.name,
             run_id=run_id,
+            redacted_fields=self.settings.reporting.redact_fields,
             overwrite=overwrite,
         )
 

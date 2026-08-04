@@ -42,9 +42,10 @@ prove it matches, and can tell you why on the day it stops.
 
    Write it by hand with invented hosts and users, or capture it from a real
    run with `dvp run --backend <live> --execute --record <name>`. A capture is
-   real estate data: redaction runs first and the manifest is marked
-   `review_required`, but reading it before it is committed is your job. Only
-   synthetic corpora belong in this repository.
+   real estate data: field-name redaction runs first and the manifest is marked
+   `review_required`, but redaction does not read values — a password inside a
+   command line survives it. Reading the recording before committing it is your
+   job. Only synthetic corpora belong in this repository.
 
 6. **Set `validation.expect:`** honestly:
 
